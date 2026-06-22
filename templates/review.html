@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}复盘记录 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🔍 复盘记录</h1>
+    <div class="header-actions">
+        <a href="/orders/?reviewed=no" class="btn">去复盘未标记单 →</a>
+    </div>
+</div>
+
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>品种</th>
+                <th>方向</th>
+                <th>盈亏</th>
+                <th>大周期趋势</th>
+                <th>交易理论</th>
+                <th>入场质量</th>
+                <th>评分</th>
+                <th>标签</th>
+                <th>复盘时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td><strong>{{ order.symbol }}</strong></td>
+                <td><span class="tag tag-{{ order.order_type }}">{{ order.order_type }}</span></td>
+                <td class="{% if order.profit >= 0 %}profit{% else %}loss{% endif %} mono">
+                    {{ "%.2f"|format(order.profit) }}
+                </td>
+                <td>{{ order.review.major_trend or '-' }}</td>
+                <td>{{ order.review.trading_theory or '-' }}</td>
+                <td>
+                    {% if order.review.entry_quality %}
+                    <span class="tag tag-quality-{{ order.review.entry_quality | lower }}">{{ order.review.entry_quality }}</span>
+                    {% else %}-{% endif %}
+                </td>
+                <td>
+                    {% if order.review.rating %}
+                    {{ '⭐' * order.review.rating }}
+                    {% else %}-{% endif %}
+                </td>
+                <td>
+                    {% if order.review.tags %}
+                    {% for tag in order.review.tags %}
+                    <span class="tag tag-default">{{ tag.strip() }}</span>
+                    {% endfor %}
+                    {% else %}-{% endif %}
+                </td>
+                <td class="mono">{{ order.review.reviewed_at }}</td>
+                <td><a href="/review/order/{{ order.id }}" class="btn-sm">查看</a></td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="10" class="empty-state">暂无复盘记录<br>
+                <a href="/orders/?reviewed=no" class="btn" style="margin-top:12px;display:inline-block;">去复盘 →</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="pagination">
+    {% if pagination.has_prev %}
+    <a href="?page={{ pagination.prev_num }}" class="btn-sm">← 上一页</a>
+    {% endif %}
+    <span class="page-info">第 {{ pagination.page }} / {{ pagination.pages }} 页</span>
+    {% if pagination.has_next %}
+    <a href="?page={{ pagination.next_num }}" class="btn-sm">下一页 →</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

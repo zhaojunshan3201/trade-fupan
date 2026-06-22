@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}仪表盘 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="dashboard">
+    <div class="page-header">
+        <h1>交易仪表盘</h1>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-trades">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            </div>
+            <div class="stat-body">
+                <div class="stat-value">{{ total_orders }}</div>
+                <div class="stat-label">总交易数</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-reviewed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            </div>
+            <div class="stat-body">
+                <div class="stat-value">{{ total_reviewed }}</div>
+                <div class="stat-label">已复盘</div>
+                <div class="stat-sub">待复盘: {{ unreviewed_count }}</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-winrate">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            </div>
+            <div class="stat-body">
+                <div class="stat-value">{{ win_rate }}%</div>
+                <div class="stat-label">胜率</div>
+                <div class="stat-sub">{{ win_count }}胜 / {{ loss_count }}负</div>
+            </div>
+        </div>
+        <div class="stat-card {% if total_pnl >= 0 %}profit{% else %}loss{% endif %}">
+            <div class="stat-icon {% if total_pnl >= 0 %}stat-icon-pnl-up{% else %}stat-icon-pnl-down{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="stat-body">
+                <div class="stat-value">{{ "%.2f"|format(total_pnl) }}</div>
+                <div class="stat-label">总盈亏</div>
+                <div class="stat-sub">平均: {{ "%.2f"|format(avg_pnl) }}</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-plans">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="stat-body">
+                <div class="stat-value">{{ total_plans }}</div>
+                <div class="stat-label">交易计划</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-closed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div class="stat-body">
+                <div class="stat-value">{{ total_closed }}</div>
+                <div class="stat-label">已平仓</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- 最近交易 -->
+        <div class="card">
+            <div class="card-header">
+                <h2>最近交易</h2>
+                <a href="/orders/" class="btn-sm">查看全部 →</a>
+            </div>
+            <div class="card-body">
+                {% if recent_orders %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>品种</th>
+                            <th>方向</th>
+                            <th>手数</th>
+                            <th>平仓时间</th>
+                            <th>盈亏</th>
+                            <th>复盘</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in recent_orders %}
+                        <tr class="{% if order.is_win %}row-win{% elif order.profit < 0 %}row-loss{% endif %}">
+                            <td>{{ order.symbol }}</td>
+                            <td><span class="tag tag-{{ order.order_type }}">{{ order.order_type }}</span></td>
+                            <td>{{ order.volume }}</td>
+                            <td>{{ order.close_time.strftime('%m-%d %H:%M') if order.close_time else '-' }}</td>
+                            <td class="{% if order.profit >= 0 %}profit{% else %}loss{% endif %} mono bold">
+                                {{ "%.2f"|format(order.profit) }}
+                            </td>
+                            <td>
+                                {% if order.is_reviewed %}
+                                <span class="tag tag-reviewed">已复盘</span>
+                                {% else %}
+                                <a href="/review/order/{{ order.id }}" class="btn-sm btn-review">去复盘</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="empty-state">暂无交易数据，请先 <a href="/import/">导入MT4数据</a></p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 活跃计划 -->
+        <div class="card">
+            <div class="card-header">
+                <h2>活跃计划</h2>
+                <a href="/plans/" class="btn-sm">查看全部 →</a>
+            </div>
+            <div class="card-body">
+                {% if active_plans %}
+                <div class="plan-list">
+                    {% for plan in active_plans %}
+                    <div class="plan-item">
+                        <div class="plan-info">
+                            <span class="tag tag-{{ plan.direction }}">{{ plan.direction }}</span>
+                            <strong>{{ plan.symbol }}</strong>
+                            <span class="plan-title">{{ plan.title }}</span>
+                        </div>
+                        <div class="plan-meta">
+                            <span class="tag tag-{{ plan.status }}">{{ plan.status }}</span>
+                            <a href="/plans/edit/{{ plan.id }}" class="btn-sm">编辑</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-state">暂无活跃计划，<a href="/plans/create">创建第一个计划</a></p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,920 @@
+{% extends "base.html" %}
+{% block title %}交易复盘审计台{% endblock %}
+
+{% block head %}
+<style>
+:root {
+    --ledger-canvas: var(--bg);
+    --ledger-panel: var(--card-bg);
+    --ledger-panel-soft: color-mix(in srgb, var(--card-bg) 92%, var(--bg));
+    --ledger-rail: var(--border);
+    --ledger-rail-strong: var(--border-hover);
+    --ledger-ink: var(--text);
+    --ledger-muted: var(--text-dim);
+    --ledger-dead: var(--text-muted);
+    --ledger-accent: var(--accent);
+    --ledger-accent-subtle: var(--accent-subtle);
+    --ledger-profit: var(--success);
+    --ledger-loss: var(--danger);
+    --ledger-paper: var(--text);
+    --ledger-mono: var(--font-mono);
+    --ledger-sans: inherit;
+}
+
+.container {
+    max-width: none;
+    padding: 0;
+}
+
+.ledger-home {
+    min-height: calc(100dvh - 56px);
+    background: var(--ledger-canvas);
+    color: var(--ledger-ink);
+    font-family: var(--ledger-sans);
+    letter-spacing: 0;
+}
+
+.ledger-home a {
+    color: inherit;
+}
+
+.ledger-shell {
+    width: min(var(--layout-max), calc(100% - 40px));
+    margin: 0 auto;
+}
+
+.ledger-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px 0 0;
+    color: var(--ledger-dead);
+    font-family: var(--ledger-mono);
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.ledger-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ledger-muted);
+}
+
+.ledger-status::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ledger-accent);
+}
+
+.ledger-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
+    gap: clamp(28px, 4vw, 56px);
+    align-items: stretch;
+    padding: clamp(42px, 6vw, 72px) 0 36px;
+}
+
+.hero-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+.hero-kicker,
+.section-kicker {
+    font-family: var(--ledger-mono);
+    color: var(--ledger-accent);
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.hero-title {
+    margin: 22px 0 22px;
+    max-width: 760px;
+    color: var(--ledger-paper);
+    font-size: clamp(42px, 6vw, 72px);
+    line-height: 0.94;
+    letter-spacing: 0;
+    font-weight: 800;
+}
+
+.market-chip {
+    display: inline-flex;
+    vertical-align: 0.1em;
+    width: 1.42em;
+    height: 0.72em;
+    border: 1px solid var(--ledger-rail-strong);
+    border-radius: 999px;
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--ledger-accent) 24%, transparent), color-mix(in srgb, var(--ledger-loss) 16%, transparent)),
+        repeating-linear-gradient(90deg, transparent 0 7px, rgba(100, 116, 139, 0.22) 8px);
+}
+
+.hero-lead {
+    max-width: 60ch;
+    color: var(--ledger-muted);
+    font-size: 15.5px;
+    line-height: 1.75;
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+}
+
+.ledger-button {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    border: 1px solid var(--ledger-rail-strong);
+    border-radius: 6px;
+    color: var(--ledger-ink);
+    background: transparent;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.ledger-button:hover {
+    border-color: var(--ledger-accent);
+    background: var(--ledger-accent-subtle);
+    text-decoration: none;
+}
+
+.ledger-button:active {
+    transform: translateY(1px);
+}
+
+.ledger-button.primary {
+    border-color: var(--ledger-accent);
+    background: var(--ledger-accent);
+    color: #fff;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 36px;
+}
+
+.metric-cell {
+    min-width: 0;
+    border-top: 1px solid var(--ledger-rail-strong);
+    padding-top: 12px;
+}
+
+.metric-value {
+    font-family: var(--ledger-mono);
+    color: var(--ledger-paper);
+    font-size: clamp(24px, 4vw, 34px);
+    font-weight: 800;
+    line-height: 1;
+}
+
+.metric-label {
+    margin-top: 7px;
+    color: var(--ledger-dead);
+    font-family: var(--ledger-mono);
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.hero-board {
+    min-width: 0;
+    border: 1px solid var(--ledger-rail);
+    background: var(--ledger-panel);
+}
+
+.board-chart {
+    position: relative;
+    min-height: 330px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--ledger-rail);
+    background:
+        radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--ledger-accent) 14%, transparent), transparent 28%),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(100, 116, 139, 0.16) 32px),
+        repeating-linear-gradient(90deg, transparent 0 43px, rgba(100, 116, 139, 0.16) 44px),
+        var(--ledger-panel);
+}
+
+.board-chart::before {
+    content: "";
+    position: absolute;
+    inset: 54px 34px 98px;
+    background:
+        linear-gradient(108deg,
+            transparent 0 12%,
+            var(--ledger-profit) 12% 14%,
+            transparent 14% 30%,
+            var(--ledger-profit) 30% 32%,
+            transparent 32% 48%,
+            var(--ledger-loss) 48% 50%,
+            transparent 50% 64%,
+            var(--ledger-profit) 64% 66%,
+            transparent 66%);
+    opacity: 0.86;
+    transform: skewY(-8deg);
+    animation: signalPulse 6s ease-in-out infinite;
+}
+
+.board-chart::after {
+    content: "ENTRY QUALITY / TRADE MEMORY";
+    position: absolute;
+    left: 18px;
+    bottom: 18px;
+    color: var(--ledger-dead);
+    font-family: var(--ledger-mono);
+    font-size: 10px;
+    letter-spacing: 0;
+}
+
+@keyframes signalPulse {
+    0%, 100% { opacity: 0.58; transform: skewY(-8deg) translateY(0); }
+    50% { opacity: 0.92; transform: skewY(-8deg) translateY(-3px); }
+}
+
+.board-head {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    right: 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    color: var(--ledger-muted);
+    font-family: var(--ledger-mono);
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.tape {
+    display: grid;
+}
+
+.tape-row,
+.review-row,
+.rank-row,
+.plan-row,
+.featured-row {
+    transition: background 0.16s ease, transform 0.16s ease;
+}
+
+.tape-row:hover,
+.review-row:hover,
+.rank-row:hover,
+.plan-row:hover,
+.featured-row:hover {
+    background: rgba(250, 250, 250, 0.035);
+}
+
+.tape-row {
+    display: grid;
+    grid-template-columns: 82px 1fr 82px;
+    gap: 14px;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--ledger-rail);
+    font-size: 12px;
+}
+
+.tape-row:last-child {
+    border-bottom: 0;
+}
+
+.symbol,
+.mono,
+.pnl,
+.grade,
+.rank-index,
+.trade-count {
+    font-family: var(--ledger-mono);
+}
+
+.symbol {
+    color: var(--ledger-paper);
+    font-weight: 800;
+}
+
+.muted {
+    color: var(--ledger-dead);
+}
+
+.pnl {
+    text-align: right;
+    font-weight: 800;
+}
+
+.profit {
+    color: var(--ledger-profit);
+}
+
+.loss {
+    color: var(--ledger-loss);
+}
+
+.section-band {
+    border-top: 1px solid var(--ledger-rail);
+}
+
+.ledger-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.28fr) minmax(320px, 0.72fr);
+    gap: 0;
+    border-left: 1px solid var(--ledger-rail);
+    border-right: 1px solid var(--ledger-rail);
+    background: var(--ledger-panel);
+}
+
+.ledger-main,
+.ledger-side {
+    min-width: 0;
+}
+
+.ledger-main {
+    border-right: 1px solid var(--ledger-rail);
+}
+
+.ledger-section {
+    padding: 28px 32px 32px;
+    border-bottom: 1px solid var(--ledger-rail);
+}
+
+.ledger-section:last-child {
+    border-bottom: 0;
+}
+
+.section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.section-title {
+    color: var(--ledger-paper);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.section-count {
+    color: var(--ledger-dead);
+    font-family: var(--ledger-mono);
+    font-size: 11px;
+}
+
+.review-ledger,
+.rank-ledger,
+.plan-ledger,
+.featured-ledger,
+.tool-ledger {
+    display: grid;
+}
+
+.review-row {
+    display: grid;
+    grid-template-columns: 78px 70px minmax(0, 1fr) 86px 92px;
+    gap: 14px;
+    align-items: center;
+    min-height: 56px;
+    border-bottom: 1px solid var(--ledger-rail);
+    font-size: 13px;
+}
+
+.review-row:last-child,
+.rank-row:last-child,
+.plan-row:last-child,
+.featured-row:last-child,
+.tool-link:last-child {
+    border-bottom: 0;
+}
+
+.lesson {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ledger-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trader {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ledger-dead);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.grade {
+    width: 34px;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ledger-rail-strong);
+    color: var(--ledger-paper);
+    font-size: 11px;
+}
+
+.direction {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    min-height: 24px;
+    border: 1px solid var(--ledger-rail-strong);
+    color: var(--ledger-muted);
+    font-family: var(--ledger-mono);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.direction.buy {
+    border-color: color-mix(in srgb, var(--ledger-profit) 58%, var(--ledger-rail));
+    color: var(--ledger-profit);
+}
+
+.direction.sell {
+    border-color: color-mix(in srgb, var(--ledger-loss) 58%, var(--ledger-rail));
+    color: var(--ledger-loss);
+}
+
+.featured-row {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr) 92px;
+    gap: 18px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--ledger-rail);
+}
+
+.featured-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    color: var(--ledger-dead);
+    font-size: 12px;
+}
+
+.featured-text {
+    color: var(--ledger-muted);
+    line-height: 1.65;
+}
+
+.rank-row {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 54px 86px;
+    gap: 12px;
+    align-items: center;
+    min-height: 48px;
+    border-bottom: 1px solid var(--ledger-rail);
+    font-size: 13px;
+}
+
+.rank-index {
+    color: var(--ledger-dead);
+    font-weight: 800;
+}
+
+.rank-name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ledger-paper);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 800;
+}
+
+.trade-count {
+    color: var(--ledger-dead);
+    text-align: right;
+    font-size: 11px;
+}
+
+.plan-row {
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) 58px;
+    gap: 12px;
+    align-items: center;
+    min-height: 58px;
+    border-bottom: 1px solid var(--ledger-rail);
+    font-size: 13px;
+}
+
+.plan-title {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ledger-paper);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 800;
+}
+
+.plan-sub {
+    margin-top: 3px;
+    color: var(--ledger-dead);
+    font-family: var(--ledger-mono);
+    font-size: 11px;
+}
+
+.plan-date {
+    color: var(--ledger-dead);
+    font-family: var(--ledger-mono);
+    font-size: 11px;
+    text-align: right;
+}
+
+.tool-link {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    min-height: 46px;
+    border-bottom: 1px solid var(--ledger-rail);
+    color: var(--ledger-muted);
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.tool-link:hover {
+    color: var(--ledger-paper);
+    text-decoration: none;
+}
+
+.tool-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ledger-accent);
+}
+
+.empty-ledger {
+    border: 1px dashed var(--ledger-rail-strong);
+    color: var(--ledger-dead);
+    padding: 22px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.ledger-foot {
+    width: min(var(--layout-max), calc(100% - 40px));
+    margin: 0 auto;
+    padding: 22px 0 34px;
+    color: var(--ledger-dead);
+    font-family: var(--ledger-mono);
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+    .ledger-shell,
+    .ledger-foot {
+        width: min(100% - 24px, 760px);
+    }
+
+    .ledger-hero,
+    .ledger-content {
+        grid-template-columns: 1fr;
+    }
+
+    .ledger-main {
+        border-right: 0;
+    }
+
+    .hero-board {
+        order: 2;
+    }
+
+    .board-chart {
+        min-height: 250px;
+    }
+}
+
+@media (max-width: 720px) {
+    .ledger-topline {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .hero-title {
+        font-size: clamp(36px, 12vw, 48px);
+        line-height: 1;
+        letter-spacing: 0;
+    }
+
+    .market-chip {
+        display: block;
+        width: 72px;
+        height: 24px;
+        margin: 12px 0 0;
+    }
+
+    .metric-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .ledger-section {
+        padding: 22px 18px;
+    }
+
+    .review-row {
+        grid-template-columns: 68px 52px minmax(0, 1fr) 76px;
+        gap: 10px;
+    }
+
+    .review-row .trader {
+        display: none;
+    }
+
+    .rank-row {
+        grid-template-columns: 30px minmax(0, 1fr) 76px;
+    }
+
+    .rank-row .trade-count {
+        display: none;
+    }
+
+    .featured-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .tape-row {
+        grid-template-columns: 74px 1fr 74px;
+        padding: 0 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ledger-shell,
+    .ledger-foot {
+        width: calc(100% - 24px);
+    }
+
+    .hero-actions {
+        flex-direction: column;
+    }
+
+    .ledger-button {
+        width: 100%;
+    }
+
+    .review-row {
+        grid-template-columns: 66px minmax(0, 1fr) 74px;
+    }
+
+    .review-row .grade {
+        display: none;
+    }
+
+    .plan-row {
+        grid-template-columns: 48px minmax(0, 1fr);
+    }
+
+    .plan-date {
+        display: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="ledger-home">
+    <div class="ledger-shell">
+        <div class="ledger-topline">
+            <span>Cockpit Ledger / Trade Review OS</span>
+            <span class="ledger-status">Public review board online</span>
+        </div>
+
+        <section class="ledger-hero" aria-label="交易复盘审计台">
+            <div class="hero-copy">
+                <div class="hero-kicker">Post-market discipline / Execution audit</div>
+                <h1 class="hero-title">复盘不是回忆，<span class="market-chip" aria-hidden="true"></span> 是交易系统的审计。</h1>
+                <p class="hero-lead">把每一笔订单拆成计划、执行、偏离、情绪和结果。这里展示真实交易记忆：谁在复盘，哪些系统有效，哪些偏离正在被修正。</p>
+
+                <div class="hero-actions">
+                    {% if current_user.is_authenticated %}
+                    <a class="ledger-button primary" href="/dashboard">进入个人仪表盘</a>
+                    <a class="ledger-button" href="/review/">查看我的复盘</a>
+                    {% else %}
+                    <a class="ledger-button primary" href="/register">建立复盘档案</a>
+                    <a class="ledger-button" href="/login">登录交易台</a>
+                    {% endif %}
+                </div>
+
+                <div class="metric-grid" aria-label="系统统计">
+                    <div class="metric-cell">
+                        <div class="metric-value">{{ total_orders }}</div>
+                        <div class="metric-label">Orders Logged</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value profit">{{ total_reviews }}</div>
+                        <div class="metric-label">Public Reviews</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value">{{ total_users }}</div>
+                        <div class="metric-label">Traders</div>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="hero-board" aria-label="最新复盘信号">
+                <div class="board-chart">
+                    <div class="board-head">
+                        <span>Entry quality map</span>
+                        <span>{{ total_reviews }} reviews</span>
+                    </div>
+                </div>
+                <div class="tape">
+                    {% if latest_reviews %}
+                        {% for review, username, symbol, otype, profit in latest_reviews[:4] %}
+                        <div class="tape-row">
+                            <span class="symbol">{{ symbol }}</span>
+                            <span class="muted">{{ review.entry_quality or review.major_trend or '待标记' }}</span>
+                            <span class="pnl {% if profit is not none and profit >= 0 %}profit{% elif profit is not none %}loss{% endif %}">
+                                {% if profit is not none %}{% if profit >= 0 %}+{% endif %}{{ "%.2f"|format(profit) }}{% else %}-{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="tape-row">
+                            <span class="symbol">NO DATA</span>
+                            <span class="muted">等待第一条公开复盘</span>
+                            <span class="pnl">-</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </aside>
+        </section>
+    </div>
+
+    <section class="section-band">
+        <div class="ledger-shell ledger-content">
+            <div class="ledger-main">
+                <section class="ledger-section" aria-labelledby="latest-reviews-title">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-kicker">Review tape</div>
+                            <h2 class="section-title" id="latest-reviews-title">最新公开复盘</h2>
+                        </div>
+                        <span class="section-count">{{ latest_reviews|length if latest_reviews else 0 }} rows</span>
+                    </div>
+
+                    {% if latest_reviews %}
+                    <div class="review-ledger">
+                        {% for review, username, symbol, otype, profit in latest_reviews %}
+                        <div class="review-row">
+                            <span class="symbol">{{ symbol }}</span>
+                            <span class="grade">{{ review.entry_quality or '-' }}</span>
+                            <span class="lesson">{{ review.lesson_learned or review.improvement or review.minor_signal or '这笔交易还没有写下复盘结论。' }}</span>
+                            <span class="pnl {% if profit is not none and profit >= 0 %}profit{% elif profit is not none %}loss{% endif %}">
+                                {% if profit is not none %}{% if profit >= 0 %}+{% endif %}{{ "%.2f"|format(profit) }}{% else %}-{% endif %}
+                            </span>
+                            <span class="trader">{{ username }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-ledger">还没有公开复盘。导入交易后，把一笔订单拆成计划、信号、情绪和偏离，首页会自动形成复盘 tape。</div>
+                    {% endif %}
+                </section>
+
+                <section class="ledger-section" aria-labelledby="featured-reviews-title">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-kicker">High-signal notes</div>
+                            <h2 class="section-title" id="featured-reviews-title">精选复盘样本</h2>
+                        </div>
+                        <span class="section-count">{{ featured_reviews|length if featured_reviews else 0 }} marked</span>
+                    </div>
+
+                    {% if featured_reviews %}
+                    <div class="featured-ledger">
+                        {% for review, username, symbol, otype, profit in featured_reviews[:6] %}
+                        <div class="featured-row">
+                            <div>
+                                <span class="symbol">{{ symbol }}</span>
+                                <div class="featured-meta">
+                                    <span>{{ username }}</span>
+                                    <span>{{ review.trading_theory or '未标记系统' }}</span>
+                                </div>
+                            </div>
+                            <div class="featured-text">{{ review.lesson_learned or review.improvement or '这条高评分复盘还没有摘要。' }}</div>
+                            <div class="pnl {% if profit is not none and profit >= 0 %}profit{% elif profit is not none %}loss{% endif %}">
+                                {% if profit is not none %}{% if profit >= 0 %}+{% endif %}{{ "%.2f"|format(profit) }}{% else %}R{{ review.rating or '-' }}{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-ledger">还没有高评分公开复盘。评分达到 4 分以上的复盘会在这里成为可复用样本。</div>
+                    {% endif %}
+                </section>
+            </div>
+
+            <aside class="ledger-side" aria-label="交易计划和排名">
+                <section class="ledger-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-kicker">Public plans</div>
+                            <h2 class="section-title">公开交易计划</h2>
+                        </div>
+                        <span class="section-count">{{ latest_plans|length if latest_plans else 0 }}</span>
+                    </div>
+
+                    {% if latest_plans %}
+                    <div class="plan-ledger">
+                        {% for plan, username in latest_plans %}
+                        <div class="plan-row">
+                            <span class="direction {{ plan.direction }}">{{ plan.direction }}</span>
+                            <div>
+                                <div class="plan-title">{{ plan.title }}</div>
+                                <div class="plan-sub">{{ plan.symbol }} / {{ username }}</div>
+                            </div>
+                            <div class="plan-date">{{ plan.plan_date.strftime('%m-%d') if plan.plan_date else '-' }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-ledger">还没有公开计划。计划创建后会在这里按时间排列。</div>
+                    {% endif %}
+                </section>
+
+                <section class="ledger-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-kicker">Leaderboard</div>
+                            <h2 class="section-title">交易员排名</h2>
+                        </div>
+                        <span class="section-count">{{ rankings|length if rankings else 0 }}</span>
+                    </div>
+
+                    {% if rankings %}
+                    <div class="rank-ledger">
+                        {% for r in rankings %}
+                        <div class="rank-row">
+                            <span class="rank-index">{{ "%02d"|format(loop.index) }}</span>
+                            <span class="rank-name">{{ r.username }}</span>
+                            <span class="trade-count">{{ r.trades }} 笔</span>
+                            <span class="pnl {% if r.total_pnl >= 0 %}profit{% else %}loss{% endif %}">
+                                {% if r.total_pnl >= 0 %}+{% endif %}{{ "%.0f"|format(r.total_pnl) }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-ledger">至少完成 3 笔已平仓交易后，排名会在这里出现。</div>
+                    {% endif %}
+                </section>
+
+                <section class="ledger-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-kicker">Utilities</div>
+                            <h2 class="section-title">市场工具</h2>
+                        </div>
+                    </div>
+                    <div class="tool-ledger">
+                        <a href="https://www.forexfactory.com/calendar" target="_blank" rel="noreferrer" class="tool-link">
+                            <span class="tool-dot"></span>
+                            <span>Forex Factory 财经日历</span>
+                        </a>
+                        <a href="https://www.investing.com/economic-calendar/" target="_blank" rel="noreferrer" class="tool-link">
+                            <span class="tool-dot"></span>
+                            <span>Investing.com 经济日历</span>
+                        </a>
+                        <a href="https://www.tradingview.com/markets/currencies/" target="_blank" rel="noreferrer" class="tool-link">
+                            <span class="tool-dot"></span>
+                            <span>TradingView 外汇市场</span>
+                        </a>
+                    </div>
+                </section>
+            </aside>
+        </div>
+    </section>
+
+    <div class="ledger-foot">Trade memory compounds only when every deviation is written down.</div>
+</main>
+{% endblock %}

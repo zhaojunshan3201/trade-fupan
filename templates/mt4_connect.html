@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}MT4 自动连接 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🔗 MT4 自动连接</h1>
+    <div class="header-actions">
+        <a href="/import/" class="btn">← 返回导入</a>
+    </div>
+</div>
+
+<!-- 连接状态 -->
+<div class="stats-grid" id="connection-stats">
+    <div class="stat-card">
+        <div class="stat-icon">🏦</div>
+        <div class="stat-body">
+            <div class="stat-value" id="acct-status">未连接</div>
+            <div class="stat-label">账户连接</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📂</div>
+        <div class="stat-body">
+            <div class="stat-value" id="watch-status">未启动</div>
+            <div class="stat-label">文件监控</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📡</div>
+        <div class="stat-body">
+            <div class="stat-value" id="zmq-status">未连接</div>
+            <div class="stat-label">ZeroMQ</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-body">
+            <div class="stat-value" id="order-count">{{ order_count }}</div>
+            <div class="stat-label">已导入订单</div>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <!-- 方案 A: Watchdog -->
+    <div class="card wide">
+        <div class="card-header">
+            <h2>🟢 方案 A: 文件监控 (Watchdog) <span class="tag tag-completed">推荐</span></h2>
+        </div>
+        <div class="card-body">
+            <div class="method-description">
+                <p><strong>原理：</strong> MQL4 脚本导出 CSV → Python watchdog 监听目录 → 自动导入 Flask</p>
+                <p><strong>优势：</strong> 稳定可靠，无需开放网络端口，MQL4 端只需写入本地文件</p>
+            </div>
+
+            <div class="setup-steps">
+                <h4>⚙️ 启动步骤</h4>
+                <div class="step-item">
+                    <span class="step-num">1</span>
+                    <span>确认 MT4 已配置并运行了 TradeExport 脚本（CSV 模式）</span>
+                </div>
+                <div class="step-item">
+                    <span class="step-num">2</span>
+                    <span>安装依赖：<code>pip install watchdog requests</code></span>
+                </div>
+                <div class="step-item">
+                    <span class="step-num">3</span>
+                    <span>运行监控脚本：</span>
+                </div>
+            </div>
+
+            <div class="code-block">
+                <pre># 自动检测 MT4 目录并启动监控
+python mt4_connect/mt4_watchdog.py
+
+# 或手动指定目录和 Flask 地址
+python mt4_connect/mt4_watchdog.py --dir "%APPDATA%\MetaQuotes\Terminal\*\Files" --url http://127.0.0.1:5000
+
+# 仅扫描一次（不持续监控）
+python mt4_connect/mt4_watchdog.py --scan</pre>
+            </div>
+
+            <div class="action-row">
+                <button class="btn btn-primary" onclick="testWatchdog()">🧪 测试扫描</button>
+                <span class="hint">点击后自动扫描 MT4 目录中的 CSV 文件</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 方案 B: ZeroMQ -->
+    <div class="card wide">
+        <div class="card-header">
+            <h2>🔵 方案 B: ZeroMQ 实时桥接</h2>
+            <span class="tag tag-active">低延迟</span>
+        </div>
+        <div class="card-body">
+            <div class="method-description">
+                <p><strong>原理：</strong> MT4 端运行 ZeroMQ EA → Python 订阅 ZeroMQ 消息 → 实时推送到 Flask</p>
+                <p><strong>优势：</strong> 实时推送，低延迟，适合需要即时复盘</p>
+                <p><strong>MT4 端额外步骤：</strong> 需要安装 <a href="https://github.com/dingmaotu/mql-zmq" target="_blank">mql-zmq</a> 库并编译 EA</p>
+            </div>
+
+            <div class="setup-steps">
+                <h4>⚙️ 启动步骤</h4>
+                <div class="step-item">
+                    <span class="step-num">1</span>
+                    <span>MT4 端安装 ZeroMQ 库并运行配套 EA</span>
+                </div>
+                <div class="step-item">
+                    <span class="step-num">2</span>
+                    <span>安装依赖：<code>pip install pyzmq requests</code></span>
+                </div>
+                <div class="step-item">
+                    <span class="step-num">3</span>
+                    <span>运行桥接脚本：</span>
+                </div>
+            </div>
+
+            <div class="code-block">
+                <pre># 启动 ZeroMQ 桥接（默认端口 5555）
+python mt4_connect/mt4_zmq_bridge.py
+
+# 指定自定义端口
+python mt4_connect/mt4_zmq_bridge.py --port 5556 --host 127.0.0.1</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 连接日志 -->
+    <div class="card wide">
+        <div class="card-header">
+            <h2>📋 连接日志</h2>
+            <button class="btn-sm" onclick="clearLog()">清空</button>
+        </div>
+        <div class="card-body" style="max-height:300px;overflow-y:auto;font-family:monospace;font-size:12px;background:#1e293b;color:#e2e8f0;border-radius:6px;padding:12px">
+            <div id="log-output">
+                <div class="dim">等待连接事件...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    loadConnectionStatus();
+    // 每5秒刷新状态
+    setInterval(loadConnectionStatus, 5000);
+});
+
+function addLog(message, type='info') {
+    const log = document.getElementById('log-output');
+    const time = new Date().toLocaleTimeString();
+    const colors = {info: '#e2e8f0', success: '#22c55e', error: '#ef4444', warn: '#f59e0b'};
+    log.innerHTML = `<div style="color:${colors[type] || colors.info}">[${time}] ${message}</div>` + log.innerHTML;
+}
+
+async function loadConnectionStatus() {
+    try {
+        // 加载账户信息
+        const acct = await fetch('/import/api/account_latest').then(r => r.json());
+        const acctStatus = document.getElementById('acct-status');
+        if (acct && acct.number) {
+            acctStatus.textContent = `${acct.number} (${acct.server})`;
+            acctStatus.style.color = 'var(--profit)';
+            addLog(`账户连接: ${acct.number} ${acct.name} 余额 $${acct.balance}`, 'success');
+        }
+
+        // 加载订单数
+        const orders = await fetch('/orders/api/list?per_page=1').then(r => r.json());
+        document.getElementById('order-count').textContent = orders.total || 0;
+    } catch(e) {
+        // 静默
+    }
+}
+
+async function testWatchdog() {
+    addLog('正在扫描 MT4 目录...', 'info');
+    try {
+        const res = await fetch('/import/api/scan_csv');
+        const data = await res.json();
+        if (data.status === 'ok') {
+            addLog(`扫描完成: 发现 ${data.files_found} 个文件，导入 ${data.imported} 条`, 'success');
+        } else {
+            addLog(data.message, 'warn');
+        }
+    } catch(e) {
+        addLog(`扫描失败: ${e.message}`, 'error');
+    }
+}
+
+function clearLog() {
+    document.getElementById('log-output').innerHTML = '<div class="dim">日志已清空</div>';
+}
+</script>
+{% endblock %}

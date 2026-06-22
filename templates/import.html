@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}导入MT4数据 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>📥 导入MT4交易数据</h1>
+    <div class="header-actions">
+        <a href="/import/api/scan_csv" class="btn" id="scanBtn">🔍 扫描MT4目录</a>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <!-- 账户信息 -->
+    <div class="card">
+        <div class="card-header"><h2>🏦 最新账户信息</h2></div>
+        <div class="card-body" id="accountInfoPanel">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+
+    <!-- MQL4 自动连接 -->
+    <div class="card">
+        <div class="card-header"><h2>⚡ MQL4 一键推送</h2></div>
+        <div class="card-body guide-text">
+            <p style="font-weight:600;color:var(--profit)">✅ 推荐方式 — 比手动导出快10倍</p>
+            <ol>
+                <li>复制 <code>TradeExport.mq4</code> 到 MT4 的 <code>Scripts\</code> 目录</li>
+                <li>在 MT4 中编译脚本 (F7)</li>
+                <li><strong>拖拽脚本到图表</strong> → 一键推送全部历史</li>
+            </ol>
+            <p style="margin-top:12px">
+                <a href="/import/mt4_connect" class="btn-sm">🔗 打开连接管理器</a>
+                <a href="/import/api/mql4_push?test=1" class="btn-sm" onclick="return testPush()">🧪 测试连接</a>
+                <a href="/import/api/account_latest" class="btn-sm" onclick="return refreshAccount()">🔄 刷新账户</a>
+            </p>
+            <p style="margin-top:8px">
+                <a href="/static/../mt4_export/TradeExport.mq4" class="btn-sm">📥 下载 TradeExport.mq4</a>
+                <a href="/static/../mt4_export/AccountInfo.mq4" class="btn-sm">📥 下载 AccountInfo.mq4</a>
+            </p>
+            <details style="margin-top:12px;font-size:12px;color:var(--text-dim)">
+                <summary>📖 MQL4 使用帮助</summary>
+                <p style="margin-top:8px">1. 复制 .mq4 文件到 <code>%APPDATA%\MetaQuotes\Terminal\[实例ID]\MQL4\Scripts\</code></p>
+                <p>2. MT4 → 工具 → MetaEditor → 打开文件 → 编译 (F7)</p>
+                <p>3. MT4 → 工具 → 选项 → EA交易 → 添加 <code>http://127.0.0.1:5000</code> 到白名单</p>
+                <p>4. 从导航器拖拽脚本到图表运行</p>
+            </details>
+        </div>
+    </div>
+
+    <!-- 手动上传 -->
+    <div class="card wide">
+        <div class="card-header"><h2>📂 手动上传CSV</h2></div>
+        <div class="card-body">
+            <form method="POST" action="/import/upload" enctype="multipart/form-data" class="upload-form">
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📂</div>
+                    <div class="upload-text">点击选择文件或将CSV文件拖拽到此处</div>
+                    <div class="upload-hint">支持 MT4 标准导出的 CSV 格式（中英文列名均可）</div>
+                    <input type="file" name="file" accept=".csv" required
+                        style="display:none" id="fileInput">
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top:16px">🚀 导入数据</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 导出指南 -->
+    <div class="card">
+        <div class="card-header"><h2>📖 手动导出指南</h2></div>
+        <div class="card-body guide-text">
+            <h4>MT4 手动导出步骤：</h4>
+            <ol>
+                <li>打开 MT4 平台</li>
+                <li>底部选择「账户历史」标签</li>
+                <li>右键 → 「自定义时间」选择全部历史</li>
+                <li>右键 → 「保存为详细账户历史」</li>
+                <li>选择 CSV 格式保存</li>
+                <li>在本页上传该文件</li>
+            </ol>
+            <h4 style="margin-top:16px">支持的中英文列名：</h4>
+            <p>Ticket/订单号、Symbol/品种、Type/类型、Open Price/开仓价、Close Price/平仓价、Profit/盈亏...</p>
+            <p style="margin-top:12px">
+                <a href="/import/sample" class="btn-sm">📥 下载样例CSV</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 上传区域交互
+    const zone = document.getElementById('uploadZone');
+    const input = document.getElementById('fileInput');
+    if (zone && input) {
+        zone.addEventListener('click', () => input.click());
+        zone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            zone.style.borderColor = '#22c55e';
+            zone.style.background = 'rgba(34, 197, 94, 0.05)';
+        });
+        zone.addEventListener('dragleave', () => {
+            zone.style.borderColor = '#d1d5db';
+            zone.style.background = '';
+        });
+        zone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            zone.style.borderColor = '#d1d5db';
+            zone.style.background = '';
+            if (e.dataTransfer.files.length > 0) {
+                input.files = e.dataTransfer.files;
+                zone.querySelector('.upload-text').textContent = '📄 ' + e.dataTransfer.files[0].name;
+            }
+        });
+        input.addEventListener('change', () => {
+            if (input.files.length > 0) {
+                zone.querySelector('.upload-text').textContent = '📄 ' + input.files[0].name;
+            }
+        });
+    }
+
+    // 加载账户信息
+    loadAccountInfo();
+});
+
+async function loadAccountInfo() {
+    const panel = document.getElementById('accountInfoPanel');
+    try {
+        const res = await fetch('/import/api/account_latest');
+        const data = await res.json();
+        if (!data || !data.number) {
+            panel.innerHTML = '<p class="empty-state">暂无账户信息<br><span style="font-size:12px">运行 MQL4 AccountInfo 脚本推送账户数据</span></p>';
+            return;
+        }
+        // 终端类型判断
+        const tt = data.terminal_type || '';
+        let badge = '<span class="tag tag-default">未知</span>';
+        if (tt === 'mt5') badge = '<span class="tag tag-completed">MT5</span>';
+        else if (tt === 'mt4') badge = '<span class="tag tag-planned">MT4</span>';
+
+        panel.innerHTML = `
+            <div class="info-grid" style="grid-template-columns:1fr 1fr">
+                <div class="info-item"><span class="info-label">账号</span><span class="info-value mono">${data.number}</span></div>
+                <div class="info-item"><span class="info-label">终端</span><span class="info-value">${badge}</span></div>
+                <div class="info-item"><span class="info-label">名称</span><span class="info-value">${data.name}</span></div>
+                <div class="info-item"><span class="info-label">服务器</span><span class="info-value">${data.server}</span></div>
+                <div class="info-item"><span class="info-label">经纪商</span><span class="info-value">${data.company}</span></div>
+                <div class="info-item"><span class="info-label">币种/杠杆</span><span class="info-value">${data.currency} / 1:${data.leverage}</span></div>
+                <div class="info-item ${data.is_demo ? '' : 'profit'}"><span class="info-label">账户类型</span><span class="info-value">${data.is_demo ? '📗 模拟盘' : '📕 实盘'}</span></div>
+                <div class="info-item"><span class="info-label">余额</span><span class="info-value bold">${data.balance.toFixed(2)}</span></div>
+                <div class="info-item"><span class="info-label">净值</span><span class="info-value">${data.equity.toFixed(2)}</span></div>
+                <div class="info-item" style="grid-column:1/-1"><span class="info-label">更新时间</span><span class="info-value mono">${data.recorded_at}</span></div>
+            </div>
+        `;
+        `;
+    } catch(e) {
+        panel.innerHTML = '<p class="empty-state">无法获取账户信息</p>';
+    }
+}
+
+async function testPush() {
+    try {
+        const res = await fetch('/import/api/mql4_push', { method: 'POST', body: '[]', headers: {'Content-Type':'application/json'} });
+        const data = await res.json();
+        alert('✅ 连接成功！服务器正常响应。\n现在去MT4运行 TradeExport 脚本推送数据吧。');
+    } catch(e) {
+        alert('❌ 连接失败。请确保 Flask 服务正在运行。');
+    }
+    return false;
+}
+
+async function refreshAccount() {
+    await loadAccountInfo();
+    return false;
+}
+</script>
+{% endblock %}

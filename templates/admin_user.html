@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}{{ user.username }} 详情 - 管理后台{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>👤 {{ user.username }} <span class="tag {% if user.is_admin %}tag-completed{% else %}tag-default{% endif %}">{{ user.role }}</span></h1>
+    <div class="header-actions">
+        <a href="/admin/impersonate/{{ user.id }}" class="btn">👤 模拟登录</a>
+        <a href="/admin/" class="btn">← 返回管理</a>
+    </div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="stats-grid">
+    <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-body">
+        <div class="stat-value">{{ total_orders }}</div><div class="stat-label">总交易</div>
+    </div></div>
+    <div class="stat-card"><div class="stat-icon">🎯</div><div class="stat-body">
+        <div class="stat-value">{{ win_rate }}%</div><div class="stat-label">胜率</div>
+        <div class="stat-sub">{{ wins }}胜 / {{ total - wins }}负</div>
+    </div></div>
+    <div class="stat-card {% if total_pnl >= 0 %}profit{% else %}loss{% endif %}"><div class="stat-icon">💰</div><div class="stat-body">
+        <div class="stat-value">${{ "%.2f"|format(total_pnl) }}</div><div class="stat-label">总盈亏</div>
+    </div></div>
+    <div class="stat-card"><div class="stat-icon">📝</div><div class="stat-body">
+        <div class="stat-value">{{ plans|length }}</div><div class="stat-label">交易计划</div>
+    </div></div>
+</div>
+
+<div class="dashboard-grid">
+    <!-- 交易记录 -->
+    <div class="card">
+        <div class="card-header"><h2>📋 最近交易 ({{ orders|length }})</h2></div>
+        <div class="card-body" style="max-height:400px;overflow-y:auto">
+            {% if orders %}
+            <table class="table">
+                <thead><tr><th>Ticket</th><th>品种</th><th>方向</th><th>盈亏</th><th>平仓时间</th></tr></thead>
+                <tbody>
+                {% for o in orders[:30] %}
+                <tr>
+                    <td class="mono">{{ o.ticket }}</td>
+                    <td>{{ o.symbol }}</td>
+                    <td><span class="tag tag-{{ o.order_type }}">{{ o.order_type }}</span></td>
+                    <td class="{% if o.profit >= 0 %}profit{% else %}loss{% endif %} mono">${{ "%.2f"|format(o.profit) }}</td>
+                    <td class="mono">{{ o.close_time.strftime('%m-%d %H:%M') if o.close_time else '-' }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}<p class="empty-state">暂无交易</p>{% endif %}
+        </div>
+    </div>
+
+    <!-- 交易计划 -->
+    <div class="card">
+        <div class="card-header"><h2>📝 交易计划 ({{ plans|length }})</h2></div>
+        <div class="card-body" style="max-height:400px;overflow-y:auto">
+            {% if plans %}
+            {% for p in plans[:20] %}
+            <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+                <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+                    <span class="tag tag-{{ p.direction }}">{{ p.direction }}</span>
+                    <strong>{{ p.symbol }}</strong>
+                    <span class="tag tag-{{ p.status }}">{{ p.status }}</span>
+                </div>
+                <span style="font-size:13px">{{ p.title }}</span>
+                {% if p.planned_entry %}
+                <span class="mono dim" style="font-size:11px"> | 入场 {{ "%.5f"|format(p.planned_entry) }} 止损 {{ "%.5f"|format(p.planned_sl) if p.planned_sl else '-' }}</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% else %}<p class="empty-state">暂无计划</p>{% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 复盘记录 -->
+<div class="card" style="margin-top:20px">
+    <div class="card-header"><h2>🔍 复盘记录 ({{ reviews|length }})</h2></div>
+    <div class="card-body">
+        {% if reviews %}
+        {% for r in reviews %}
+        <div class="review-item" id="review-{{ r.id }}" style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
+                <div>
+                    <strong>{{ r.order.symbol }}</strong>
+                    <span class="tag tag-{{ r.order.order_type }}">{{ r.order.order_type }}</span>
+                    <span class="{% if r.order.profit >= 0 %}profit{% else %}loss{% endif %} mono bold">${{ "%.2f"|format(r.order.profit) }}</span>
+                    {% if r.entry_quality %}
+                    <span class="tag tag-quality-{{ r.entry_quality | lower }}">{{ r.entry_quality }}</span>
+                    {% endif %}
+                    {% if r.rating %}{{ '⭐' * r.rating }}{% endif %}
+                </div>
+                <span class="mono dim" style="font-size:11px">{{ r.reviewed_at.strftime('%m-%d %H:%M') if r.reviewed_at else '-' }}</span>
+            </div>
+
+            {% if r.major_trend or r.trading_theory %}
+            <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px">
+                {% if r.major_trend %}📈 趋势: {{ r.major_trend }} {% endif %}
+                {% if r.trading_theory %}📖 理论: {{ r.trading_theory }} {% endif %}
+                {% if r.emotional_state %}😊 情绪: {{ r.emotional_state }} {% endif %}
+            </div>
+            {% endif %}
+
+            {% if r.lesson_learned %}
+            <div style="font-size:13px;margin:8px 0;padding:8px;background:#fef3c7;border-radius:4px">💡 {{ r.lesson_learned[:200] }}</div>
+            {% endif %}
+
+            <!-- 管理员点评区 -->
+            <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #f59e0b">
+                <span style="font-size:11px;color:#f59e0b;font-weight:600">🔧 管理员点评</span>
+                <textarea class="form-input" rows="2" style="font-size:12px;margin-top:4px"
+                    id="note-{{ r.id }}">{{ r.admin_note or '' }}</textarea>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+                    <button class="btn-sm" onclick="saveNote({{ r.id }})">💬 保存</button>
+                    <span id="status-{{ r.id }}" style="font-size:11px;color:var(--text-dim)">
+                        {% if r.admin_note_at %}已点评: {{ r.admin_note_at }}{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}<p class="empty-state">暂无复盘记录</p>{% endif %}
+    </div>
+</div>
+
+<script>
+async function saveNote(reviewId) {
+    const note = document.getElementById('note-' + reviewId).value;
+    const r = await fetch('/admin/api/review_note/' + reviewId, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({note})
+    });
+    const d = await r.json();
+    if (d.status === 'ok') {
+        document.getElementById('status-' + reviewId).textContent = '✅ 已保存 ' + (d.admin_note_at || '');
+    }
+}
+</script>
+{% endblock %}

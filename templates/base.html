@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}交易复盘系统{% endblock %}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=7">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                交易复盘
+            </a>
+
+            <button class="nav-toggle" onclick="document.querySelector('.nav-wrap').classList.toggle('open')" aria-label="菜单">
+                <span></span><span></span><span></span>
+            </button>
+
+            <div class="nav-wrap">
+                {% if current_user.is_authenticated %}
+                <div class="nav-links">
+                    <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">首页</a>
+                    <a href="/dashboard" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">仪表盘</a>
+                    <a href="/orders/" class="nav-link {% if request.path.startswith('/orders') %}active{% endif %}">交易</a>
+                    <a href="/review/" class="nav-link {% if request.path.startswith('/review') %}active{% endif %}">复盘</a>
+                    <a href="/analysis/" class="nav-link {% if request.path.startswith('/analysis') %}active{% endif %}">分析</a>
+                    <a href="/plans/" class="nav-link {% if request.path.startswith('/plans') %}active{% endif %}">计划</a>
+
+                    <div class="nav-more">
+                        <button class="nav-link" type="button">更多</button>
+                        <div class="nav-dropdown">
+                            <a href="/import/" class="{% if request.path.startswith('/import') and '/mt' not in request.path %}active{% endif %}">数据导入</a>
+                            <a href="/import/mt4_connect" class="{% if '/mt4_connect' in request.path %}active{% endif %}">MT4 连接</a>
+                            <a href="/import/mt5_connect" class="{% if '/mt5_connect' in request.path %}active{% endif %}">MT5 连接</a>
+                            <a href="/accounts/" class="{% if '/accounts' in request.path %}active{% endif %}">账户管理</a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="nav-links nav-right">
+                    {% if current_user.is_authenticated %}
+                    <div class="nav-more">
+                        <button class="nav-link nav-user" type="button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            {{ current_user.username }}
+                        </button>
+                        <div class="nav-dropdown nav-dropdown-right">
+                            <a href="/profile">个人资料</a>
+                            {% if current_user.is_admin %}
+                            <a href="/admin/">系统管理</a>
+                            {% endif %}
+                            <hr>
+                            <a href="/logout">退出登录</a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <a href="/login" class="nav-link {% if '/login' in request.path %}active{% endif %}">登录</a>
+                    <a href="/register" class="nav-link btn btn-primary" style="padding:6px 14px;font-size:13px">注册</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message | safe }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=3"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

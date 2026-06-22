@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+{% block title %}复盘 - {{ order.symbol }} {{ order.order_type }} - 交易复盘系统{% endblock %}
+{% block head %}
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+.chart-container {
+    width: 100%;
+    height: 380px;
+    position: relative;
+}
+.chart-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 380px;
+    background: #f8fafc;
+    border-radius: 6px;
+    color: #64748b;
+    font-size: 14px;
+    flex-direction: column;
+    gap: 8px;
+}
+.chart-loading {
+    height: 380px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #64748b;
+    background: #f8fafc;
+    border-radius: 6px;
+}
+.tf-selector {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.tf-btn {
+    padding: 4px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: monospace;
+}
+.tf-btn:hover { border-color: #3b82f6; }
+.tf-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+.chart-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    margin-top: 8px;
+    color: #64748b;
+}
+.chart-legend .entry-dot { color: #22c55e; }
+.chart-legend .exit-dot { color: #ef4444; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🔍 交易复盘</h1>
+    <a href="{% if review %}/review/{% else %}/orders/{% endif %}" class="btn">← 返回</a>
+</div>
+
+<!-- K线快照 -->
+<div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+        <h2>📈 交易快照 — {{ order.symbol }}</h2>
+        <div style="display:flex;align-items:center;gap:12px">
+            <div class="tf-selector" id="tfSelector">
+                {% for tf in ['M1','M5','M15','M30','H1','H4','D1'] %}
+                <button class="tf-btn {% if (review and review.trade_timeframe == tf) or (not review and tf == 'M5') %}active{% endif %}" data-tf="{{ tf }}" onclick="switchTimeframe('{{ tf }}', this)">{{ tf }}</button>
+                {% endfor %}
+            </div>
+            <div class="chart-legend">
+                <span class="entry-dot">● 入场</span><span class="exit-dot">● 出场</span>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="chartArea">
+            <div class="chart-loading" id="chartLoading">⏳ K线数据加载中...</div>
+            <div id="chartContainer" class="chart-container" style="display:none"></div>
+            <div class="chart-error" id="chartError" style="display:none">
+                <span>📭 无法获取K线数据</span>
+                <span style="font-size:12px" id="chartErrorMsg"></span>
+                <span style="font-size:12px">请确保 <strong>MT5终端正在运行</strong> 且品种历史数据已加载</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 订单信息卡片 -->
+<div class="card order-info-card">
+    <div class="card-header">
+        <h2>订单信息 #{{ order.ticket }}</h2>
+    </div>
+    <div class="card-body">
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">品种</span>
+                <span class="info-value"><strong>{{ order.symbol }}</strong></span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">方向</span>
+                <span class="info-value"><span class="tag tag-{{ order.order_type }}">{{ order.order_type }}</span></span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">手数</span>
+                <span class="info-value">{{ order.volume }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">开仓价</span>
+                <span class="info-value mono">{{ "%.5f"|format(order.open_price) }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">平仓价</span>
+                <span class="info-value mono">{{ "%.5f"|format(order.close_price) if order.close_price else '-' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">开仓时间</span>
+                <span class="info-value mono">{{ order.open_time.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">平仓时间</span>
+                <span class="info-value mono">{{ order.close_time.strftime('%Y-%m-%d %H:%M:%S') if order.close_time else '-' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">盈亏</span>
+                <span class="info-value {% if order.profit >= 0 %}profit{% else %}loss{% endif %} bold">
+                    {{ "%.2f"|format(order.profit) }}
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">止损</span>
+                <span class="info-value mono">{{ "%.5f"|format(order.sl) if order.sl else '未设置' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">止盈</span>
+                <span class="info-value mono">{{ "%.5f"|format(order.tp) if order.tp else '未设置' }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 复盘表单 -->
+<form method="POST" action="/review/save/{{ order.id }}" class="review-form">
+    <div class="card">
+        <div class="card-header"><h2>📝 复盘内容</h2></div>
+        <div class="card-body">
+            <div class="form-section">
+                <h3>一、交易背景分析</h3>
+
+                <div class="form-group">
+                    <label class="form-label">1. 基本面背景</label>
+                    <textarea name="fundamental_context" rows="3" class="form-input">{{ review.fundamental_context if review else '' }}</textarea>
+                    <span class="form-hint">当时市场在关注什么？有无重要数据公布、央行决议、地缘事件？</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">2. 大周期趋势状态</label>
+                    <div class="radio-group">
+                        {% for trend in ['上升趋势', '下降趋势', '震荡整理', '趋势转换期', '无明确趋势'] %}
+                        <label class="radio-label">
+                            <input type="radio" name="major_trend" value="{{ trend }}"
+                                {% if review and review.major_trend == trend %}checked{% endif %}>
+                            {{ trend }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <span class="form-hint">日线/周线级别的趋势方向</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">3. 小周期下单信号</label>
+                    <textarea name="minor_signal" rows="3" class="form-input">{{ review.minor_signal if review else '' }}</textarea>
+                    <span class="form-hint">M15/H1 级别看到的具体入场信号：K线形态、指标信号、支撑阻力等</span>
+                </div>
+
+                <input type="hidden" name="trade_timeframe" id="tradeTimeframeInput"
+                       value="{{ review.trade_timeframe if review else 'auto' }}">
+
+                <div class="form-group">
+                    <label class="form-label">4. 用的什么交易理论/系统</label>
+                    <div class="radio-group">
+                        {% for theory in ['道氏理论', '缠论', '谐波形态', '供需/SMC', '裸K/价格行为', '均线系统', '布林带', 'MACD', 'RSI/KDJ', '海龟交易', '趋势线/通道', '支撑阻力', '斐波那契', '订单流/Volume Profile', '威科夫', '其他'] %}
+                        <label class="radio-label">
+                            <input type="radio" name="trading_theory" value="{{ theory }}"
+                                {% if review and review.trading_theory == theory %}checked{% endif %}>
+                            {{ theory }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>二、交易执行评估</h3>
+
+                <div class="form-group">
+                    <label class="form-label">5. 入场质量评分</label>
+                    <div class="radio-group">
+                        {% for q in [('A', 'A - 完美入场，价格精准到达计划位置'), ('B', 'B - 良好入场，基本符合预期'), ('C', 'C - 一般入场，位置不够理想'), ('D', 'D - 较差入场，追单或情绪化')] %}
+                        <label class="radio-label">
+                            <input type="radio" name="entry_quality" value="{{ q[0] }}"
+                                {% if review and review.entry_quality == q[0] %}checked{% endif %}>
+                            {{ q[1] }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">6. 出场原因</label>
+                    <textarea name="exit_reason" rows="2" class="form-input">{{ review.exit_reason if review else '' }}</textarea>
+                    <span class="form-hint">为什么平仓？止损/止盈/手动/反向信号？</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">7. 交易时情绪状态</label>
+                    <div class="radio-group radio-inline">
+                        {% for e in ['冷静', '兴奋', '紧张', '焦虑', '懊悔', '急躁', '恐惧', '贪婪', '自信', '无所谓'] %}
+                        <label class="radio-label">
+                            <input type="radio" name="emotional_state" value="{{ e }}"
+                                {% if review and review.emotional_state == e %}checked{% endif %}>
+                            {{ e }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" name="is_planned_trade" {% if review and review.is_planned_trade %}checked{% endif %}>
+                        是按计划执行的交易
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">偏离计划的原因</label>
+                    <textarea name="plan_deviation" rows="2" class="form-input">{{ review.plan_deviation if review else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>三、复盘总结</h3>
+
+                <div class="form-group">
+                    <label class="form-label">8. 经验教训</label>
+                    <textarea name="lesson_learned" rows="3" class="form-input">{{ review.lesson_learned if review else '' }}</textarea>
+                    <span class="form-hint">从这单交易中，你学到了什么？有哪些可以改进的地方？</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">9. 改进方向</label>
+                    <textarea name="improvement" rows="2" class="form-input">{{ review.improvement if review else '' }}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">10. 标签（逗号分隔）</label>
+                    <input type="text" name="tags" class="form-input" value="{{ review.tags if review else '' }}" placeholder="例如: 趋势跟踪,假突破,持仓过短">
+                    <span class="form-hint">便于日后统计分类的关键词</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">11. 总体评分</label>
+                    <div class="star-rating">
+                        {% for i in range(5, 0, -1) %}
+                        <label class="star-label">
+                            <input type="radio" name="rating" value="{{ i }}"
+                                {% if review and review.rating == i %}checked{% endif %}>
+                            {{ '⭐' * i }} {{ i }}/5
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">✅ 保存复盘</button>
+        <a href="{% if review %}/review/{% else %}/orders/{% endif %}" class="btn">取消</a>
+    </div>
+</form>
+
+{% if current_user.is_authenticated and current_user.is_admin %}
+<div class="card" style="border-color:#f59e0b;margin-top:16px">
+    <div class="card-header"><h2>🔧 管理员点评</h2></div>
+    <div class="card-body">
+        <textarea id="adminNote" class="form-input" rows="3"
+            placeholder="对这笔交易的复盘进行点评...">{{ review.admin_note if review else '' }}</textarea>
+        <button type="button" class="btn btn-primary" style="margin-top:8px" onclick="saveAdminNote()">💬 保存点评</button>
+        <span id="adminNoteStatus" style="font-size:12px;color:var(--text-dim);margin-left:8px">
+            {% if review and review.admin_note_at %}上次点评: {{ review.admin_note_at }}{% endif %}
+        </span>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let chart = null;
+let candleSeries = null;
+let entryMarker = null;
+let exitMarker = null;
+let currentTf = '{{ review.trade_timeframe if review and review.trade_timeframe else "auto" }}';
+const ORDER_ID = {{ order.id }};
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (currentTf === 'auto' || !currentTf) {
+        // 首次加载，自动推断
+        currentTf = 'auto';
+    }
+    loadChart(currentTf);
+});
+
+function switchTimeframe(tf, btn) {
+    // UI
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTf = tf;
+    document.getElementById('tradeTimeframeInput').value = tf;
+
+    // 重新加载
+    loadChart(tf);
+}
+
+async function loadChart(tf) {
+    const loading = document.getElementById('chartLoading');
+    const container = document.getElementById('chartContainer');
+    const errorDiv = document.getElementById('chartError');
+
+    loading.style.display = 'flex';
+    container.style.display = 'none';
+    errorDiv.style.display = 'none';
+
+    try {
+        let url = `/review/api/candles/${ORDER_ID}`;
+        if (tf && tf !== 'auto') {
+            url += `?tf=${tf}`;
+        }
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.status !== 'ok' || !data.candles || data.candles.length === 0) {
+            loading.style.display = 'none';
+            errorDiv.style.display = 'flex';
+            document.getElementById('chartErrorMsg').textContent = data.message || '无K线数据';
+            return;
+        }
+
+        // 更新活跃周期按钮
+        if (data.timeframe && data.timeframe !== 'auto') {
+            document.querySelectorAll('.tf-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.tf === data.timeframe);
+            });
+            currentTf = data.timeframe;
+            document.getElementById('tradeTimeframeInput').value = data.timeframe;
+        }
+
+        loading.style.display = 'none';
+        container.style.display = 'block';
+        renderChart(data);
+    } catch(e) {
+        loading.style.display = 'none';
+        errorDiv.style.display = 'flex';
+        document.getElementById('chartErrorMsg').textContent = '服务器错误: ' + e.message;
+    }
+}
+
+function renderChart(data) {
+    const container = document.getElementById('chartContainer');
+    container.innerHTML = ''; // 清空
+
+    chart = LightweightCharts.createChart(container, {
+        layout: {
+            background: { type: 'solid', color: '#ffffff' },
+            textColor: '#333',
+        },
+        grid: {
+            vertLines: { color: '#f0f0f0' },
+            horzLines: { color: '#f0f0f0' },
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+            borderColor: '#ddd',
+        },
+        timeScale: {
+            borderColor: '#ddd',
+            timeVisible: true,
+            secondsVisible: false,
+        },
+        width: container.clientWidth,
+        height: 380,
+    });
+
+    // K线序列
+    candleSeries = chart.addCandlestickSeries({
+        upColor: '#22c55e',
+        downColor: '#ef4444',
+        borderDownColor: '#ef4444',
+        borderUpColor: '#22c55e',
+        wickDownColor: '#ef4444',
+        wickUpColor: '#22c55e',
+    });
+
+    // 格式化数据
+    const candleData = data.candles.map(c => ({
+        time: c.time,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+    }));
+    candleSeries.setData(candleData);
+
+    // 入场标记（绿色水平线）
+    if (data.entry_price && data.entry_idx !== null) {
+        const entryTime = candleData[data.entry_idx]?.time;
+        candleSeries.createPriceLine({
+            price: data.entry_price,
+            color: '#22c55e',
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            axisLabelVisible: true,
+            title: '入场',
+        });
+        if (entryTime) {
+            candleSeries.setMarkers([{
+                time: entryTime,
+                position: data.order_type === 'buy' ? 'belowBar' : 'aboveBar',
+                color: '#22c55e',
+                shape: 'arrowUp' + (data.order_type === 'sell' ? '' : '') || 'arrowUp',
+                text: '入场 ' + data.entry_price,
+            }]);
+        }
+    }
+
+    // 出场标记（红色水平线）
+    if (data.exit_price && data.exit_idx !== null && data.exit_price) {
+        const exitIdx = Math.min(data.exit_idx, candleData.length - 1);
+        const exitTime = candleData[exitIdx]?.time;
+        candleSeries.createPriceLine({
+            price: data.exit_price,
+            color: '#ef4444',
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: '出场',
+        });
+        if (exitTime) {
+            candleSeries.setMarkers([
+                ...(candleSeries.markers?.() || []),
+                {
+                    time: exitTime,
+                    position: 'aboveBar',
+                    color: '#ef4444',
+                    shape: 'arrowDown',
+                    text: '出场 ' + data.exit_price,
+                }
+            ]);
+        }
+    }
+
+    // 自适应
+    chart.timeScale().fitContent();
+
+    // 响应式
+    window.addEventListener('resize', () => {
+        if (chart && container) {
+            chart.applyOptions({ width: container.clientWidth });
+        }
+    });
+}
+
+// 管理员点评
+{% if current_user.is_authenticated and current_user.is_admin %}
+async function saveAdminNote() {
+    const note = document.getElementById('adminNote').value;
+    const reviewId = {{ review.id if review else 0 }};
+    if (!reviewId) return;
+
+    const r = await fetch(`/admin/api/review_note/${reviewId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({note})
+    });
+    const d = await r.json();
+    if (d.status === 'ok') {
+        document.getElementById('adminNoteStatus').textContent = '✅ 已保存 ' + (d.admin_note_at || '');
+    }
+}
+{% endif %}
+</script>
+{% endblock %}

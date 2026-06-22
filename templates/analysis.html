@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}统计分析 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>📊 统计分析</h1>
+    <div class="header-actions">
+        <select id="accountFilter" onchange="switchAccount(this.value)" style="padding:6px 12px;border:1px solid #d1d5db;border-radius:4px;font-size:13px">
+            <option value="">📋 全部账户</option>
+            {% for acct in accounts %}
+            <option value="{{ acct.number }}">🏦 #{{ acct.number }} ({{ acct.count }} 笔)</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<!-- 概览统计 -->
+<div class="stats-grid" id="overview-stats">
+    <div class="stat-card loading"><div class="stat-body"><div class="stat-value">...</div><div class="stat-label">加载中...</div></div></div>
+</div>
+
+<div class="dashboard-grid">
+    <!-- 资金曲线 -->
+    <div class="card wide">
+        <div class="card-header">
+            <h2>💰 资金曲线</h2>
+            <div class="tab-group">
+                <button class="tab-btn active" onclick="switchEquityChart('all')">全部</button>
+                <button class="tab-btn" onclick="switchEquityChart('monthly')">按月</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <canvas id="equityChart" height="300"></canvas>
+        </div>
+    </div>
+
+    <!-- 月度统计 -->
+    <div class="card">
+        <div class="card-header"><h2>📅 月度盈亏</h2></div>
+        <div class="card-body">
+            <canvas id="monthlyChart" height="250"></canvas>
+        </div>
+    </div>
+
+    <!-- 品种分析 -->
+    <div class="card">
+        <div class="card-header"><h2>🎯 品种分析</h2></div>
+        <div class="card-body">
+            <canvas id="symbolChart" height="250"></canvas>
+        </div>
+    </div>
+
+    <!-- 方向统计 -->
+    <div class="card">
+        <div class="card-header"><h2>↔️ 方向分析</h2></div>
+        <div class="card-body">
+            <canvas id="typeChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- 复盘洞察 -->
+    <div class="card wide">
+        <div class="card-header"><h2>🧠 复盘洞察</h2></div>
+        <div class="card-body">
+            <div class="insight-grid" id="review-insights"></div>
+            <canvas id="qualityChart" height="200"></script>
+        </div>
+    </div>
+
+    <!-- 交易理论分布 -->
+    <div class="card">
+        <div class="card-header"><h2>📖 交易理论分布</h2></div>
+        <div class="card-body">
+            <canvas id="theoryChart" height="250"></canvas>
+        </div>
+    </div>
+
+    <!-- 复盘vs未复盘对比 -->
+    <div class="card">
+        <div class="card-header"><h2>⚖️ 复盘效果对比</h2></div>
+        <div class="card-body" id="comparison-panel">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% endblock %}

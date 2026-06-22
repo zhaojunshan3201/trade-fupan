@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}交易计划 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>📋 交易计划</h1>
+    <div class="header-actions">
+        <a href="/plans/create" class="btn btn-primary">+ 新建计划</a>
+    </div>
+</div>
+
+<!-- 筛选 -->
+<div class="filter-bar">
+    <form method="get" class="filter-form">
+        <div class="filter-group">
+            <label>状态</label>
+            <select name="status" onchange="this.form.submit()">
+                <option value="">全部状态</option>
+                <option value="planned" {% if current_status == 'planned' %}selected{% endif %}>待执行</option>
+                <option value="active" {% if current_status == 'active' %}selected{% endif %}>执行中</option>
+                <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>已完成</option>
+                <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>已取消</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>品种</label>
+            <select name="symbol" onchange="this.form.submit()">
+                <option value="">全部品种</option>
+                {% for s in symbols %}
+                <option value="{{ s }}" {% if current_symbol == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- 计划卡片列表 -->
+<div class="plan-cards">
+    {% for plan in plans %}
+    <div class="plan-card status-{{ plan.status }}">
+        <div class="plan-card-header">
+            <div class="plan-card-title">
+                <span class="tag tag-{{ plan.direction }}">{{ plan.direction }}</span>
+                <span class="tag tag-{{ plan.status }}">{{ plan.status }}</span>
+                <strong>{{ plan.symbol }}</strong>
+                <span class="plan-title-text">{{ plan.title }}</span>
+            </div>
+            <div class="plan-card-actions">
+                <a href="/plans/edit/{{ plan.id }}" class="btn-sm">✏️ 编辑</a>
+                {% if plan.status in ('planned', 'active') %}
+                <a href="/plans/execution/{{ plan.id }}" class="btn-sm btn-primary">📝 记录执行</a>
+                {% endif %}
+                <form method="post" action="/plans/delete/{{ plan.id }}" style="display:inline" onsubmit="return confirm('确定删除？')">
+                    <button type="submit" class="btn-sm btn-danger">🗑️</button>
+                </form>
+            </div>
+        </div>
+        <div class="plan-card-body">
+            <div class="plan-detail-grid">
+                <div class="plan-detail">
+                    <span class="detail-label">计划日期</span>
+                    <span>{{ plan.plan_date }}</span>
+                </div>
+                <div class="plan-detail">
+                    <span class="detail-label">计划入场</span>
+                    <span class="mono">{{ "%.5f"|format(plan.planned_entry) if plan.planned_entry else '-' }}</span>
+                </div>
+                <div class="plan-detail">
+                    <span class="detail-label">止损</span>
+                    <span class="mono loss">{{ "%.5f"|format(plan.planned_sl) if plan.planned_sl else '-' }}</span>
+                </div>
+                <div class="plan-detail">
+                    <span class="detail-label">目标位</span>
+                    <span class="mono profit">{{ "%.5f"|format(plan.planned_tp1) if plan.planned_tp1 else '-' }}</span>
+                </div>
+                <div class="plan-detail">
+                    <span class="detail-label">风险比例</span>
+                    <span>{{ plan.risk_percent }}%</span>
+                </div>
+                <div class="plan-detail">
+                    <span class="detail-label">优先级</span>
+                    <span class="tag tag-{{ plan.priority }}">{{ plan.priority }}</span>
+                </div>
+            </div>
+
+            {% if plan.entry_reason %}
+            <div class="plan-reason">
+                <strong>入场理由:</strong> {{ plan.entry_reason[:100] }}{% if plan.entry_reason|length > 100 %}...{% endif %}
+            </div>
+            {% endif %}
+
+            {% if plan.status == 'completed' and plan.actual_profit is not none %}
+            <div class="plan-result {% if plan.actual_profit >= 0 %}profit{% else %}loss{% endif %}">
+                📊 实际盈亏: {{ "%.2f"|format(plan.actual_profit) }}
+                {% if plan.execution_score %} | 执行评分: {{ '⭐' * plan.execution_score }}{% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state" style="grid-column:1/-1;text-align:center;padding:60px 20px;">
+        <p>暂无交易计划</p>
+        <a href="/plans/create" class="btn btn-primary" style="margin-top:16px;display:inline-block;">+ 创建第一个交易计划</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

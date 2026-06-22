@@ -1,0 +1,17 @@
+Flask==3.1.0
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+python-dateutil==2.9.0
+
+# 生产数据库 (选其一)
+psycopg2-binary==2.9.10   # PostgreSQL
+PyMySQL==1.1.1             # MySQL/MariaDB
+
+# MT4 自动连接
+APScheduler==3.11.2
+watchdog==6.0.0
+pyzmq==26.3.0
+requests==2.32.3
+
+# MT5 官方 Python API
+MetaTrader5==5.0.45

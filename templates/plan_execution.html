@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}记录执行 - {{ plan.title }} - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>📝 记录执行情况</h1>
+    <div class="header-actions">
+        <a href="/plans/" class="btn">← 返回计划列表</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2>📋 计划概要</h2></div>
+    <div class="card-body">
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">计划</span>
+                <span class="info-value"><strong>{{ plan.title }}</strong></span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">品种/方向</span>
+                <span class="info-value">
+                    <span class="tag tag-{{ plan.direction }}">{{ plan.direction }}</span>
+                    {{ plan.symbol }}
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">入场价</span>
+                <span class="info-value mono">{{ "%.5f"|format(plan.planned_entry) if plan.planned_entry else '-' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">止损/止盈</span>
+                <span class="info-value mono">
+                    {{ "%.5f"|format(plan.planned_sl) if plan.planned_sl else '-' }} /
+                    {{ "%.5f"|format(plan.planned_tp1) if plan.planned_tp1 else '-' }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form method="POST" class="review-form">
+    <div class="card">
+        <div class="card-header"><h2>执行记录</h2></div>
+        <div class="card-body">
+            <div class="form-row three-col">
+                <div class="form-group">
+                    <label class="form-label">状态</label>
+                    <select name="status" class="form-input">
+                        <option value="active" {% if plan.status == 'active' %}selected{% endif %}>执行中</option>
+                        <option value="completed" {% if plan.status == 'completed' %}selected{% endif %}>已完成</option>
+                        <option value="cancelled" {% if plan.status == 'cancelled' %}selected{% endif %}>已取消</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">关联 MT4 订单号</label>
+                    <input type="number" name="related_order_ticket" class="form-input"
+                        value="{{ plan.related_order_ticket if plan else '' }}" placeholder="可选">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">执行评分</label>
+                    <select name="execution_score" class="form-input">
+                        <option value="">未评分</option>
+                        {% for i in range(1,6) %}
+                        <option value="{{ i }}" {% if plan.execution_score == i %}selected{% endif %}>{{ '⭐' * i }} {{ i }}/5</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row three-col">
+                <div class="form-group">
+                    <label class="form-label">实际入场时间</label>
+                    <input type="datetime-local" name="actual_entry_time" class="form-input"
+                        value="{{ plan.actual_entry_time.strftime('%Y-%m-%dT%H:%M') if plan.actual_entry_time else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">实际出场时间</label>
+                    <input type="datetime-local" name="actual_exit_time" class="form-input"
+                        value="{{ plan.actual_exit_time.strftime('%Y-%m-%dT%H:%M') if plan.actual_exit_time else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">实际手数</label>
+                    <input type="number" name="actual_volume" step="0.01" class="form-input"
+                        value="{{ plan.actual_volume if plan else '' }}" placeholder="0.10">
+                </div>
+            </div>
+
+            <div class="form-row three-col">
+                <div class="form-group">
+                    <label class="form-label">实际入场价</label>
+                    <input type="number" name="actual_entry" step="0.00001" class="form-input"
+                        value="{{ plan.actual_entry if plan else '' }}" placeholder="1.09500">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">实际出场价</label>
+                    <input type="number" name="actual_exit" step="0.00001" class="form-input"
+                        value="{{ plan.actual_exit if plan else '' }}" placeholder="1.10000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">实际盈亏</label>
+                    <input type="number" name="actual_profit" step="0.01" class="form-input"
+                        value="{{ plan.actual_profit if plan else '' }}" placeholder="25.00">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">回顾总结</label>
+                <textarea name="review_notes" rows="4" class="form-input">{{ plan.review_notes if plan else '' }}</textarea>
+                <span class="form-hint">计划执行得如何？有没有按照计划做？哪些地方可以改进？</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">💾 保存执行记录</button>
+        <a href="/plans/" class="btn">取消</a>
+    </div>
+</form>
+{% endblock %}

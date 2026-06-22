@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}管理后台 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🔧 管理后台</h1>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-body">
+        <div class="stat-value">{{ total_users }}</div><div class="stat-label">注册用户</div>
+    </div></div>
+    <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-body">
+        <div class="stat-value">{{ total_orders }}</div><div class="stat-label">总交易</div>
+    </div></div>
+    <div class="stat-card"><div class="stat-icon">🔍</div><div class="stat-body">
+        <div class="stat-value">{{ total_reviews }}</div><div class="stat-label">总复盘</div>
+    </div></div>
+    <div class="stat-card"><div class="stat-icon">📝</div><div class="stat-body">
+        <div class="stat-value">{{ total_plans }}</div><div class="stat-label">总计划</div>
+    </div></div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2>📊 用户列表</h2></div>
+    <div class="card-body" style="overflow-x:auto">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th><th>用户名</th><th>邮箱</th><th>角色</th><th>状态</th>
+                    <th>交易</th><th>复盘</th><th>计划</th><th>盈亏</th>
+                    <th>注册时间</th><th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stat in user_stats %}
+                <tr id="row-{{ stat.user.id }}">
+                    <td class="mono">{{ stat.user.id }}</td>
+                    <td><a href="/admin/user/{{ stat.user.id }}" style="font-weight:600;color:var(--accent)">{{ stat.user.username }}</a></td>
+                    <td class="mono">{{ stat.user.email or '-' }}</td>
+                    <td><span class="tag {% if stat.user.is_admin %}tag-completed{% else %}tag-default{% endif %}">{{ stat.user.role }}</span></td>
+                    <td><span class="tag {% if stat.user.is_active %}tag-completed{% else %}tag-cancelled{% endif %}" id="status-{{ stat.user.id }}">{{ '启用' if stat.user.is_active else '禁用' }}</span></td>
+                    <td>{{ stat.order_count }}</td>
+                    <td>{{ stat.review_count }}</td>
+                    <td>{{ stat.plan_count }}</td>
+                    <td class="{% if stat.total_pnl >= 0 %}profit{% else %}loss{% endif %}">${{ "%.2f"|format(stat.total_pnl) }}</td>
+                    <td class="mono">{{ stat.user.created_at.strftime('%Y-%m-%d') if stat.user.created_at else '-' }}</td>
+                    <td style="white-space:nowrap">
+                        <a href="/admin/impersonate/{{ stat.user.id }}" class="btn-sm" onclick="return confirm('将以 {{ stat.user.username }} 身份登录，继续？')">👤 模拟</a>
+                        <button class="btn-sm" onclick="toggleUser({{ stat.user.id }})">{{ '🔒 禁用' if stat.user.is_active else '🔓 启用' }}</button>
+                        <button class="btn-sm" onclick="resetPass({{ stat.user.id }})">🔑 重置</button>
+                        {% if not stat.user.is_admin %}
+                        <button class="btn-sm btn-danger" onclick="deleteUser({{ stat.user.id }}, '{{ stat.user.username }}')">🗑️</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+async function toggleUser(uid) {
+    if(!confirm('确定?')) return;
+    const r = await fetch(`/admin/api/toggle_user/${uid}`, {method:'POST'});
+    const d = await r.json();
+    alert(d.message);
+    location.reload();
+}
+
+async function resetPass(uid) {
+    const pw = prompt('新密码（默认 123456）：', '123456');
+    if(!pw) return;
+    const r = await fetch(`/admin/api/reset_password/${uid}`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({password:pw})
+    });
+    const d = await r.json();
+    alert(d.message);
+}
+
+async function deleteUser(uid, name) {
+    if(!confirm(`确定删除用户 ${name} 及其所有数据？\n此操作不可撤销！`)) return;
+    const r = await fetch(`/admin/api/delete_user/${uid}`, {method:'DELETE'});
+    const d = await r.json();
+    alert(d.message);
+    if(d.status==='ok') document.getElementById('row-'+uid)?.remove();
+}
+</script>
+{% endblock %}

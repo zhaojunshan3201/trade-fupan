@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% block title %}MT5 直连 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🔵 MT5 官方直连</h1>
+    <div class="header-actions">
+        <a href="/import/" class="btn">← 返回导入</a>
+    </div>
+</div>
+
+<div class="stats-grid" id="mt5-stats">
+    <div class="stat-card">
+        <div class="stat-icon">📦</div>
+        <div class="stat-body">
+            <div class="stat-value" id="mt5-pkg-status">检测中...</div>
+            <div class="stat-label">MetaTrader5 包</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">🏦</div>
+        <div class="stat-body">
+            <div class="stat-value" id="mt5-acct-status">未连接</div>
+            <div class="stat-label">MT5 终端</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div class="stat-body">
+            <div class="stat-value" id="mt5-balance">-</div>
+            <div class="stat-label">余额</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-body">
+            <div class="stat-value" id="mt5-orders">{{ order_count }}</div>
+            <div class="stat-label">已导入订单</div>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <!-- 主操作面板 -->
+    <div class="card wide">
+        <div class="card-header">
+            <h2>⚡ MT5 一键导入</h2>
+            <span class="tag tag-completed">官方直连</span>
+        </div>
+        <div class="card-body">
+            <div class="method-description">
+                <p style="font-weight:600;color:var(--profit);font-size:15px">
+                    ✅ 点击下方按钮直接连接 MT5，无需手动运行脚本
+                </p>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="action-bar">
+                <button class="btn btn-primary btn-lg" onclick="testConnection()" id="btnTest">
+                    🔍 测试连接
+                </button>
+                <button class="btn btn-lg" onclick="runImport()" id="btnImport" disabled>
+                    📥 一键导入全部历史
+                </button>
+                <button class="btn btn-lg" onclick="runImport(30)" id="btnImport30" disabled>
+                    📥 导入最近30天
+                </button>
+                <span class="hint" id="importHint">请先测试连接</span>
+            </div>
+
+            <!-- 连接详情 -->
+            <div id="connection-detail" style="margin-top:16px;display:none">
+                <div class="info-grid" style="grid-template-columns:1fr 1fr 1fr;background:var(--bg);padding:16px;border-radius:8px">
+                    <div class="info-item"><span class="info-label">账号</span><span class="info-value mono" id="det-number">-</span></div>
+                    <div class="info-item"><span class="info-label">服务器</span><span class="info-value" id="det-server">-</span></div>
+                    <div class="info-item"><span class="info-label">公司</span><span class="info-value" id="det-company">-</span></div>
+                    <div class="info-item"><span class="info-label">余额</span><span class="info-value profit" id="det-balance">-</span></div>
+                    <div class="info-item"><span class="info-label">净值</span><span class="info-value" id="det-equity">-</span></div>
+                    <div class="info-item"><span class="info-label">杠杆</span><span class="info-value" id="det-leverage">-</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 连接状态 -->
+    <div class="card">
+        <div class="card-header"><h2>🔄 连接状态</h2></div>
+        <div class="card-body">
+            <div class="status-list">
+                <div class="status-item" id="status-pkg">
+                    <span class="status-dot" id="dot-pkg"></span>
+                    <span>MetaTrader5 Python 包</span>
+                    <span class="status-text" id="txt-pkg">检测中...</span>
+                </div>
+                <div class="status-item" id="status-term">
+                    <span class="status-dot" id="dot-term"></span>
+                    <span>MT5 终端运行中</span>
+                    <span class="status-text" id="txt-term">等待检测</span>
+                </div>
+                <div class="status-item" id="status-acct">
+                    <span class="status-dot" id="dot-acct"></span>
+                    <span>账户已登录</span>
+                    <span class="status-text" id="txt-acct">等待检测</span>
+                </div>
+                <div class="status-item" id="status-import">
+                    <span class="status-dot" id="dot-import"></span>
+                    <span>数据导入结果</span>
+                    <span class="status-text" id="txt-import">等待导入</span>
+                </div>
+            </div>
+
+            <div style="margin-top:16px">
+                <button class="btn" onclick="checkMetaTrader5Package()" style="width:100%;justify-content:center">
+                    🔍 检查 MetaTrader5 包
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快捷信息 -->
+    <div class="card">
+        <div class="card-header"><h2>📋 命令参考</h2></div>
+        <div class="card-body" style="font-size:12px">
+            <p><code style="font-size:11px">pip install MetaTrader5 requests</code></p>
+            <p style="margin-top:8px"><code style="font-size:11px">python mt5_connect/mt5_connector.py --info</code></p>
+            <p style="margin-top:8px"><code style="font-size:11px">python mt5_connect/mt5_connector.py --watch</code></p>
+            <hr style="margin:12px 0;border-color:var(--border)">
+            <p style="color:var(--text-dim)">MT5 终端需正在运行<br>工具→选项→EA交易→允许DLL导入</p>
+        </div>
+    </div>
+
+    <!-- 完整日志 -->
+    <div class="card wide">
+        <div class="card-header">
+            <h2>📋 实时日志</h2>
+            <div style="display:flex;gap:6px">
+                <button class="btn-sm" onclick="clearMt5Log()">清空</button>
+                <button class="btn-sm" onclick="copyMt5Log()">📋 复制</button>
+            </div>
+        </div>
+        <div class="card-body" style="max-height:300px;overflow-y:auto;font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:12px;background:#1e293b;color:#e2e8f0;border-radius:6px;padding:12px">
+            <div id="mt5-log-output">
+                <div style="color:#64748b">等待操作...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    addMt5Log('🟢 MT5 连接页面已加载', 'info');
+    addMt5Log('点击"测试连接"检查 MT5 状态', 'info');
+    loadOrdersCount();
+});
+
+// ========== 日志 ==========
+function addMt5Log(msg, type='info') {
+    const log = document.getElementById('mt5-log-output');
+    const time = new Date().toLocaleTimeString('zh-CN', {hour12:false});
+    const colors = {info: '#e2e8f0', success: '#22c55e', error: '#ef4444', warn: '#f59e0b', data: '#60a5fa'};
+    const icon = {info: 'ℹ️', success: '✅', error: '❌', warn: '⚠️', data: '📊'};
+    const line = document.createElement('div');
+    line.style.color = colors[type] || colors.info;
+    line.textContent = `[${time}] ${msg}`;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+}
+
+function clearMt5Log() {
+    document.getElementById('mt5-log-output').innerHTML = '<div style="color:#64748b">日志已清空</div>';
+}
+
+function copyMt5Log() {
+    const log = document.getElementById('mt5-log-output');
+    const text = Array.from(log.children).map(d => d.textContent).join('\n');
+    navigator.clipboard?.writeText(text);
+    addMt5Log('📋 日志已复制到剪贴板', 'success');
+}
+
+// ========== 状态指示 ==========
+function setStatus(id, ok, text) {
+    const dot = document.getElementById('dot-' + id);
+    const txt = document.getElementById('txt-' + id);
+    if (dot) {
+        dot.className = 'status-dot ' + (ok ? 'dot-ok' : 'dot-fail');
+    }
+    if (txt) {
+        txt.textContent = text;
+        txt.style.color = ok ? 'var(--profit)' : (text.includes('等待') ? 'var(--text-dim)' : 'var(--loss)');
+    }
+}
+
+function setStatCard(id, value, color) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = value; if (color) el.style.color = color; }
+}
+
+// ========== 测试连接 ==========
+async function testConnection() {
+    const btn = document.getElementById('btnTest');
+    const importBtn = document.getElementById('btnImport');
+    const importBtn30 = document.getElementById('btnImport30');
+    const hint = document.getElementById('importHint');
+    const detailPanel = document.getElementById('connection-detail');
+
+    btn.disabled = true;
+    btn.textContent = '🔄 连接中...';
+    addMt5Log('正在检测 MT5 连接...', 'info');
+    setStatus('pkg', false, '检测中...');
+    setStatus('term', false, '检测中...');
+    setStatus('acct', false, '检测中...');
+
+    try {
+        const res = await fetch('/import/api/mt5_test', { method: 'POST' });
+        let data;
+        try {
+            data = await res.json();
+        } catch (jsonErr) {
+            const text = await res.text();
+            addMt5Log(`❌ 服务器返回非JSON: ${text.substring(0,200)}`, 'error');
+            btn.disabled = false;
+            btn.textContent = '🔍 测试连接';
+            return;
+        }
+
+        // 包状态
+        if (data.package_installed) {
+            setStatus('pkg', true, '✅ 已安装');
+            setStatCard('mt5-pkg-status', '已安装', 'var(--profit)');
+            addMt5Log('✅ MetaTrader5 包已安装', 'success');
+        } else {
+            setStatus('pkg', false, '❌ 未安装');
+            setStatCard('mt5-pkg-status', '未安装', 'var(--loss)');
+            addMt5Log('❌ MetaTrader5 包未安装', 'error');
+            addMt5Log('💡 请运行: pip install MetaTrader5', 'warn');
+            btn.disabled = false;
+            btn.textContent = '🔍 测试连接';
+            return;
+        }
+
+        // 终端状态
+        if (data.terminal_running) {
+            setStatus('term', true, '✅ 运行中');
+            addMt5Log('✅ MT5 终端运行中', 'success');
+        } else {
+            setStatus('term', false, '❌ 未运行');
+            setStatCard('mt5-acct-status', '未运行', 'var(--loss)');
+            addMt5Log('❌ MT5 终端未运行或无法连接', 'error');
+            addMt5Log('💡 ' + (data.error || '请确保MT5已打开并登录'), 'warn');
+            btn.disabled = false;
+            btn.textContent = '🔍 测试连接';
+            return;
+        }
+
+        // 账户状态
+        if (data.account_connected && data.account) {
+            const acct = data.account;
+            setStatus('acct', true, `✅ ${acct.number} (${acct.server})`);
+            setStatCard('mt5-acct-status', acct.number, 'var(--profit)');
+            setStatCard('mt5-balance', '$' + acct.balance.toFixed(2), 'var(--profit)');
+            addMt5Log(`🏦 已连接: ${acct.number} ${acct.name} | ${acct.server}`, 'success');
+            addMt5Log(`💰 余额: $${acct.balance.toFixed(2)}  净值: $${acct.equity.toFixed(2)}`, 'data');
+
+            // 显示详情
+            detailPanel.style.display = 'block';
+            document.getElementById('det-number').textContent = acct.number;
+            document.getElementById('det-server').textContent = acct.server;
+            document.getElementById('det-company').textContent = acct.company;
+            document.getElementById('det-balance').textContent = '$' + acct.balance.toFixed(2);
+            document.getElementById('det-equity').textContent = '$' + acct.equity.toFixed(2);
+            document.getElementById('det-leverage').textContent = '1:' + acct.leverage;
+
+            // 启用导入按钮
+            importBtn.disabled = false;
+            importBtn30.disabled = false;
+            hint.textContent = '✅ 连接成功，点击导入数据';
+            hint.style.color = 'var(--profit)';
+            addMt5Log('✅ 连接测试通过！可以导入数据了', 'success');
+        } else {
+            setStatus('acct', false, '❌ 未登录');
+            addMt5Log('❌ MT5 已连接但未获取到账户信息', 'error');
+            addMt5Log('💡 请在 MT5 中登录交易账户', 'warn');
+        }
+
+    } catch(e) {
+        addMt5Log(`❌ 连接测试失败: ${e.message}`, 'error');
+        addMt5Log('💡 请确保 Flask 服务运行正常', 'warn');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔍 测试连接';
+    }
+}
+
+// ========== 一键导入 ==========
+async function runImport(days) {
+    const importBtn = document.getElementById('btnImport');
+    const importBtn30 = document.getElementById('btnImport30');
+
+    importBtn.disabled = true;
+    importBtn30.disabled = true;
+    const btn = days ? importBtn30 : importBtn;
+    btn.textContent = '🔄 导入中...';
+
+    const label = days ? `最近 ${days} 天` : '全部历史';
+    addMt5Log(`📥 开始导入 ${label}...`, 'info');
+    setStatus('import', false, '导入中...');
+
+    try {
+        const res = await fetch('/import/api/mt5_import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days: days || 0 })
+        });
+        let data;
+        try {
+            data = await res.json();
+        } catch (jsonErr) {
+            const text = await res.text();
+            addMt5Log(`❌ 服务器异常: ${text.substring(0,300)}`, 'error');
+            setStatus('import', false, '❌ 服务器错误');
+            importBtn.disabled = false;
+            importBtn30.disabled = false;
+            btn.textContent = days ? '📥 导入近30天' : '📥 一键导入全部历史';
+            return;
+        }
+
+        // 显示所有日志
+        if (data.logs) {
+            data.logs.forEach(log => {
+                addMt5Log(log.msg, log.level);
+            });
+        }
+
+        if (data.status === 'ok') {
+            const count = data.imported || 0;
+            setStatus('import', true, `✅ 导入 ${count} 条`);
+            addMt5Log(`✅ 导入完成！共 ${count} 条记录`, 'success');
+            addMt5Log('🔗 打开「交易记录」查看', 'info');
+            // 刷新订单数
+            loadOrdersCount();
+        } else {
+            setStatus('import', false, '❌ 导入失败');
+            addMt5Log('❌ 导入失败', 'error');
+        }
+
+    } catch(e) {
+        setStatus('import', false, `❌ ${e.message}`);
+        addMt5Log(`❌ 导入异常: ${e.message}`, 'error');
+    } finally {
+        importBtn.disabled = false;
+        importBtn30.disabled = false;
+        btn.textContent = days ? '📥 导入近30天' : '📥 一键导入全部历史';
+    }
+}
+
+async function loadOrdersCount() {
+    try {
+        const r = await fetch('/orders/api/list?per_page=1').then(r => r.json());
+        document.getElementById('mt5-orders').textContent = r.total || 0;
+    } catch(e) {}
+}
+
+async function checkMetaTrader5Package() {
+    addMt5Log('正在检查 MetaTrader5 包...', 'info');
+    try {
+        const res = await fetch('/import/api/mt5_test', { method: 'POST' });
+        const data = await res.json();
+        if (data.package_installed) {
+            addMt5Log('✅ MetaTrader5 已安装', 'success');
+            addMt5Log('💡 点击"测试连接"连接 MT5 终端', 'info');
+        } else {
+            addMt5Log('❌ MetaTrader5 未安装', 'error');
+            addMt5Log('💡 运行: pip install MetaTrader5', 'warn');
+        }
+    } catch(e) {
+        addMt5Log(`❌ 检查失败: ${e.message}`, 'error');
+    }
+}
+</script>
+{% endblock %}

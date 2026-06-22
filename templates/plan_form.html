@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}{% if plan %}编辑{% else %}创建{% endif %}交易计划 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{% if plan %}✏️ 编辑交易计划{% else %}📝 创建交易计划{% endif %}</h1>
+    <a href="/plans/" class="btn">← 返回</a>
+</div>
+
+<form method="POST" class="review-form">
+    <div class="card">
+        <div class="card-header"><h2>基本信息</h2></div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">计划标题 *</label>
+                    <input type="text" name="title" class="form-input" required
+                        value="{{ plan.title if plan else '' }}" placeholder="例如: EURUSD 趋势跟随">
+                </div>
+            </div>
+            <div class="form-row three-col">
+                <div class="form-group">
+                    <label class="form-label">品种 *</label>
+                    <input type="text" name="symbol" class="form-input" required
+                        value="{{ plan.symbol if plan else '' }}" placeholder="EURUSD">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">方向 *</label>
+                    <select name="direction" class="form-input" required>
+                        <option value="buy" {% if plan and plan.direction == 'buy' %}selected{% endif %}>做多 (Buy)</option>
+                        <option value="sell" {% if plan and plan.direction == 'sell' %}selected{% endif %}>做空 (Sell)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">优先级</label>
+                    <select name="priority" class="form-input">
+                        <option value="high" {% if plan and plan.priority == 'high' %}selected{% endif %}>高</option>
+                        <option value="medium" {% if plan and plan.priority == 'medium' or not plan %}selected{% endif %}>中</option>
+                        <option value="low" {% if plan and plan.priority == 'low' %}selected{% endif %}>低</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row three-col">
+                <div class="form-group">
+                    <label class="form-label">计划日期</label>
+                    <input type="date" name="plan_date" class="form-input"
+                        value="{{ plan.plan_date.strftime('%Y-%m-%d') if plan else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">目标执行日期</label>
+                    <input type="date" name="target_date" class="form-input"
+                        value="{{ plan.target_date.strftime('%Y-%m-%d') if plan and plan.target_date else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">状态</label>
+                    <select name="status" class="form-input">
+                        <option value="planned" {% if not plan or plan.status == 'planned' %}selected{% endif %}>待执行</option>
+                        <option value="active" {% if plan and plan.status == 'active' %}selected{% endif %}>执行中</option>
+                        <option value="completed" {% if plan and plan.status == 'completed' %}selected{% endif %}>已完成</option>
+                        <option value="cancelled" {% if plan and plan.status == 'cancelled' %}selected{% endif %}>已取消</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h2>分析依据</h2></div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="form-label">基本面分析</label>
+                <textarea name="fundamental_analysis" rows="3" class="form-input">{{ plan.fundamental_analysis if plan else '' }}</textarea>
+                <span class="form-hint">当前宏观经济背景、重要数据预期、央行政策方向等</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">技术面分析</label>
+                <textarea name="technical_analysis" rows="3" class="form-input">{{ plan.technical_analysis if plan else '' }}</textarea>
+                <span class="form-hint">大周期趋势判断、关键支撑阻力位、指标信号等</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">入场理由</label>
+                <textarea name="entry_reason" rows="2" class="form-input">{{ plan.entry_reason if plan else '' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">入场条件</label>
+                <textarea name="entry_condition" rows="2" class="form-input">{{ plan.entry_condition if plan else '' }}</textarea>
+                <span class="form-hint">触发入场需要满足哪些条件？</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">出场条件</label>
+                <textarea name="exit_condition" rows="2" class="form-input">{{ plan.exit_condition if plan else '' }}</textarea>
+                <span class="form-hint">止盈/止损/移动止损条件</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h2>计划价位</h2></div>
+        <div class="card-body">
+            <div class="form-row three-col">
+                <div class="form-group">
+                    <label class="form-label">计划入场价</label>
+                    <input type="number" name="planned_entry" step="0.00001" class="form-input"
+                        value="{{ plan.planned_entry if plan else '' }}" placeholder="1.09500">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">止损价</label>
+                    <input type="number" name="planned_sl" step="0.00001" class="form-input"
+                        value="{{ plan.planned_sl if plan else '' }}" placeholder="1.09000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">风险比例(%)</label>
+                    <input type="number" name="risk_percent" step="0.1" class="form-input"
+                        value="{{ plan.risk_percent if plan else '' }}" placeholder="1.0">
+                </div>
+            </div>
+            <div class="form-row three-col">
+                <div class="form-group">
+                    <label class="form-label">第一目标位</label>
+                    <input type="number" name="planned_tp1" step="0.00001" class="form-input"
+                        value="{{ plan.planned_tp1 if plan else '' }}" placeholder="1.10000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">第二目标位</label>
+                    <input type="number" name="planned_tp2" step="0.00001" class="form-input"
+                        value="{{ plan.planned_tp2 if plan else '' }}" placeholder="1.10500">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">💾 保存计划</button>
+        <a href="/plans/" class="btn">取消</a>
+    </div>
+</form>
+{% endblock %}

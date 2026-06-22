@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}账户管理 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🏦 平台 & 账户管理</h1>
+    <div class="header-actions">
+        <span style="font-size:12px;color:var(--text-dim);margin-right:12px" id="syncStatus">
+            {% if sync_state.last_sync_at %}
+            ✅ 上次: {{ sync_state.last_sync_at }} | 下次: {{ sync_state.next_sync_at or '--' }} | 间隔 {{ sync_state.interval_minutes }}分钟
+            {% else %}
+            ⏳ 等待首次同步
+            {% endif %}
+        </span>
+        <button class="btn btn-primary btn-sm" onclick="syncAll()" id="btnSyncAll">🔄 立即同步全部</button>
+    </div>
+</div>
+
+<!-- 客户端连接器 -->
+<div class="card" style="margin-bottom:20px;border-color:var(--accent)">
+    <div class="card-header">
+        <h2>💻 客户端连接器</h2>
+        <span class="tag tag-completed">服务器部署必备</span>
+    </div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">
+            ⚠️ 服务器部署后，需要在你电脑上运行客户端连接器，自动读取本地MT4/MT5数据推送到服务器。
+        </p>
+        <div class="form-row three-col">
+            <div class="form-group">
+                <label class="form-label">你的 API Token</label>
+                <div style="display:flex;gap:6px">
+                    <input id="apiToken" class="form-input mono" readonly style="font-size:11px"
+                        value="{{ current_user.api_token or '点击生成...' }}">
+                    <button class="btn btn-primary btn-sm" onclick="generateToken()" style="white-space:nowrap">生成Token</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">服务器地址</label>
+                <input id="serverUrl" class="form-input mono" value="http://127.0.0.1:5000" readonly>
+            </div>
+            <div class="form-group">
+                <label class="form-label">客户端下载</label>
+                <a href="/static/../client/start.bat" class="btn btn-sm">📥 start.bat</a>
+                <a href="/static/../client/mt5_push.py" class="btn btn-sm">📥 MT5脚本</a>
+                <a href="/static/../client/mt4_push.py" class="btn btn-sm">📥 MT4脚本</a>
+            </div>
+        </div>
+        <div class="code-block" style="margin-top:12px;font-size:12px">
+<pre>:: 1. 下载 client/ 文件夹到你的电脑
+:: 2. 编辑 config.ini，填入 API Token 和服务器地址
+:: 3. 双击 start.bat 启动
+:: 4. 可选：设置开机自启 (Win+R → shell:startup → 放快捷方式)</pre>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 平台列表 ============ -->
+<div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+        <h2>📡 交易平台</h2>
+        <button class="btn btn-primary btn-sm" onclick="showPlatformForm()">+ 添加平台</button>
+    </div>
+    <div class="card-body">
+        <div id="platformList">
+            {% if platforms %}
+            <table class="table">
+                <thead><tr><th>名称</th><th>类型</th><th>服务器</th><th>经纪商</th><th>连接方式</th><th>账户数</th><th>操作</th></tr></thead>
+                <tbody>
+                {% for p in platforms %}
+                <tr id="platform-{{ p.id }}">
+                    <td><strong>{{ p.name }}</strong></td>
+                    <td><span class="tag {% if p.platform_type == 'mt5' %}tag-completed{% else %}tag-planned{% endif %}">{{ p.platform_type.upper() }}</span></td>
+                    <td class="mono">{{ p.server }}</td>
+                    <td>{{ p.broker or '-' }}</td>
+                    <td>{{ p.api_type }}</td>
+                    <td>{{ p.accounts.count() }}</td>
+                    <td>
+                        <button class="btn-sm" onclick="testPlatform({{ p.id }})">🔍 测试</button>
+                        <button class="btn-sm" onclick="editPlatform({{ p.id }})">✏️</button>
+                        <button class="btn-sm" onclick="deletePlatform({{ p.id }})">🗑️</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state">尚未配置交易平台<br><button class="btn btn-primary" style="margin-top:12px" onclick="showPlatformForm()">+ 添加第一个平台</button></p>
+            {% endif %}
+        </div>
+
+        <!-- 添加/编辑平台表单 -->
+        <div id="platformForm" style="display:none;margin-top:16px;padding:16px;background:var(--bg);border-radius:8px">
+            <h3 id="platformFormTitle">添加平台</h3>
+            <input type="hidden" id="pfId">
+            <div class="form-row three-col">
+                <div class="form-group"><label class="form-label">平台名称</label><input id="pfName" class="form-input" placeholder="如: TradeMax MT5"></div>
+                <div class="form-group"><label class="form-label">类型</label><select id="pfType" class="form-input"><option value="mt5">MT5 (官方API)</option><option value="mt4">MT4 (脚本/CSV)</option></select></div>
+                <div class="form-group"><label class="form-label">连接方式</label><select id="pfApi" class="form-input"><option value="terminal">终端直连</option><option value="zmq">ZeroMQ桥接</option></select></div>
+            </div>
+            <div class="form-row three-col">
+                <div class="form-group"><label class="form-label">服务器</label><input id="pfServer" class="form-input" placeholder="TradeMaxGlobal-Demo"></div>
+                <div class="form-group"><label class="form-label">经纪商</label><input id="pfBroker" class="form-input" placeholder="TradeMax Global"></div>
+                <div class="form-group"><label class="form-label">MT5路径(可选)</label><input id="pfPath" class="form-input" placeholder="C:\...\terminal64.exe"></div>
+            </div>
+            <button class="btn btn-primary" onclick="savePlatform()">💾 保存</button>
+            <button class="btn" onclick="hidePlatformForm()">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 账户列表 ============ -->
+<div class="card">
+    <div class="card-header">
+        <h2>💳 交易账户</h2>
+        <button class="btn btn-primary btn-sm" onclick="showAccountForm()">+ 添加账户</button>
+    </div>
+    <div class="card-body">
+        <div id="accountList">
+            {% if trading_accounts %}
+            <table class="table">
+                <thead><tr><th>账号</th><th>名称</th><th>平台</th><th>类型</th><th>币种/杠杆</th><th>状态</th><th>最后同步</th><th>操作</th></tr></thead>
+                <tbody>
+                {% for a in trading_accounts %}
+                <tr id="acct-{{ a.id }}">
+                    <td class="mono bold">{{ a.account_number }}</td>
+                    <td>{{ a.account_name or '-' }}</td>
+                    <td><span class="tag {% if a.platform.platform_type == 'mt5' %}tag-completed{% else %}tag-planned{% endif %}">{{ a.platform.name }}</span></td>
+                    <td>{{ '📗 模拟' if a.is_demo else '📕 实盘' }}</td>
+                    <td>{{ a.currency or '-' }} {% if a.leverage %}/ 1:{{ a.leverage }}{% endif %}</td>
+                    <td><span class="tag tag-{{ a.sync_status }}">{{ a.sync_status }}</span></td>
+                    <td class="mono">{{ a.last_sync_at.strftime('%m-%d %H:%M') if a.last_sync_at else '-' }}</td>
+                    <td>
+                        <button class="btn-sm btn-primary" onclick="syncAccount({{ a.id }})">🔄 同步</button>
+                        <button class="btn-sm" onclick="testAccount({{ a.id }})">🔍</button>
+                        <button class="btn-sm" onclick="deleteAccount({{ a.id }})">🗑️</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state">尚未添加交易账户<br><span style="font-size:12px">先配置平台，再添加对应账户</span></p>
+            {% endif %}
+        </div>
+
+        <!-- 添加账户表单 -->
+        <div id="accountForm" style="display:none;margin-top:16px;padding:16px;background:var(--bg);border-radius:8px">
+            <h3>添加账户</h3>
+            <div class="form-row three-col">
+                <div class="form-group"><label class="form-label">绑定平台</label><select id="acctPlatform" class="form-input">{% for p in platforms %}<option value="{{ p.id }}">{{ p.name }} ({{ p.platform_type.upper() }})</option>{% endfor %}</select></div>
+                <div class="form-group"><label class="form-label">账号</label><input id="acctNumber" class="form-input" type="number" placeholder="60102506"></div>
+                <div class="form-group"><label class="form-label">账户名称</label><input id="acctName" class="form-input" placeholder="如: 主账户"></div>
+            </div>
+            <div class="form-row three-col">
+                <div class="form-group"><label class="form-label">密码(可选, 加密存储)</label><input id="acctPwd" class="form-input" type="password"></div>
+                <div class="form-group"><label class="form-label">类型</label><select id="acctDemo" class="form-input"><option value="1">模拟盘</option><option value="0">实盘</option></select></div>
+                <div class="form-group"><label class="form-label">币种</label><input id="acctCurrency" class="form-input" placeholder="USD"></div>
+            </div>
+            <button class="btn btn-primary" onclick="saveAccount()">💾 保存</button>
+            <button class="btn" onclick="hideAccountForm()">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 同步日志 -->
+<div class="card" style="margin-top:20px">
+    <div class="card-header"><h2>📋 同步日志</h2></div>
+    <div class="card-body" style="max-height:200px;overflow-y:auto;font-family:monospace;font-size:12px;background:#1e293b;color:#e2e8f0;border-radius:6px;padding:12px">
+        <div id="syncLog"><span style="color:#64748b">等待操作...</span></div>
+    </div>
+</div>
+
+<script>
+let pfData = [];
+
+function addLog(msg, color='#e2e8f0') {
+    const t = new Date().toLocaleTimeString();
+    document.getElementById('syncLog').innerHTML = `<div style="color:${color}">[${t}] ${msg}</div>` + document.getElementById('syncLog').innerHTML;
+}
+
+async function syncAll() {
+    const btn = document.getElementById('btnSyncAll');
+    btn.disabled = true; btn.textContent = '🔄 同步中...';
+    addLog('🔄 手动触发全部账户同步...', '#60a5fa');
+    const r = await fetch('/accounts/api/sync_all', {method:'POST'});
+    const d = await r.json();
+    addLog(d.message, d.status==='ok'?'#22c55e':'#ef4444');
+    setTimeout(()=>{ location.reload(); }, 3000);
+}
+
+// 定期刷新同步状态
+setInterval(async () => {
+    try {
+        const r = await fetch('/accounts/api/sync_status');
+        const d = await r.json();
+        const el = document.getElementById('syncStatus');
+        if (d.last_sync_at) {
+            el.innerHTML = `✅ 上次: ${d.last_sync_at} | 下次: ${d.next_sync_at || '--'} | 间隔 ${d.interval_minutes}分钟`;
+        }
+        if (d.running) {
+            document.getElementById('btnSyncAll').disabled = true;
+        } else {
+            document.getElementById('btnSyncAll').disabled = false;
+        }
+    } catch(e) {}
+}, 10000);
+
+// ======== 平台 ========
+function showPlatformForm() { document.getElementById('platformForm').style.display='block'; document.getElementById('pfId').value=''; document.getElementById('platformFormTitle').textContent='添加平台'; }
+function hidePlatformForm() { document.getElementById('platformForm').style.display='none'; }
+async function savePlatform() {
+    const id = document.getElementById('pfId').value;
+    const data = {
+        name: document.getElementById('pfName').value,
+        platform_type: document.getElementById('pfType').value,
+        server: document.getElementById('pfServer').value,
+        broker: document.getElementById('pfBroker').value,
+        api_type: document.getElementById('pfApi').value,
+        mt5_path: document.getElementById('pfPath').value,
+    };
+    const url = id ? `/accounts/api/platforms/${id}` : '/accounts/api/platforms';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    if(r.ok){ location.reload(); } else { alert('保存失败'); }
+}
+function editPlatform(id) {
+    fetch('/accounts/api/platforms').then(r=>r.json()).then(plats=>{
+        const p = plats.find(function(x){return x.id==id});
+        if(!p) return;
+        document.getElementById('pfId').value = p.id;
+        document.getElementById('pfName').value = p.name;
+        document.getElementById('pfType').value = p.platform_type;
+        document.getElementById('pfServer').value = p.server;
+        document.getElementById('pfBroker').value = p.broker || '';
+        document.getElementById('pfApi').value = p.api_type;
+        document.getElementById('platformFormTitle').textContent = '编辑平台';
+        document.getElementById('platformForm').style.display = 'block';
+    });
+}
+async function deletePlatform(id) { if(!confirm('删除平台将同时删除其下所有账户，确定？')) return; await fetch(`/accounts/api/platforms/${id}`, {method:'DELETE'}); location.reload(); }
+async function testPlatform(id) {
+    addLog(`正在测试平台 #${id}...`, '#60a5fa');
+    const r = await fetch(`/accounts/api/platforms/${id}/test`, {method:'POST'});
+    const d = await r.json();
+    addLog(`${d.status==='ok'?'✅':'❌'} ${d.message}`, d.status==='ok'?'#22c55e':'#ef4444');
+    if(d.account) addLog(`  账户: ${d.account.number} ${d.account.server} 余额$${d.account.balance}`, '#60a5fa');
+}
+
+// ======== 账户 ========
+function showAccountForm() { document.getElementById('accountForm').style.display='block'; }
+async function generateToken() {
+    const r = await fetch('/accounts/api/token', {method:'POST'});
+    const d = await r.json();
+    if (d.token) document.getElementById('apiToken').value = d.token;
+}
+
+function hideAccountForm() { document.getElementById('accountForm').style.display='none'; }
+async function saveAccount() {
+    const data = {
+        platform_id: document.getElementById('acctPlatform').value,
+        account_number: document.getElementById('acctNumber').value,
+        account_name: document.getElementById('acctName').value,
+        password: document.getElementById('acctPwd').value,
+        is_demo: document.getElementById('acctDemo').value === '1',
+        currency: document.getElementById('acctCurrency').value,
+    };
+    const r = await fetch('/accounts/api/accounts', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    if(r.ok){ location.reload(); } else { alert('保存失败'); }
+}
+async function deleteAccount(id) { if(!confirm('确定删除？')) return; await fetch(`/accounts/api/accounts/${id}`, {method:'DELETE'}); location.reload(); }
+async function testAccount(id) {
+    addLog(`测试账户 #${id}...`, '#60a5fa');
+    const r = await fetch(`/accounts/api/accounts/${id}/test`, {method:'POST'});
+    const d = await r.json();
+    addLog(`${d.status==='ok'?'✅':'❌'} ${d.message}`, d.status==='ok'?'#22c55e':'#ef4444');
+}
+async function syncAccount(id) {
+    addLog(`🔄 开始同步账户...`, '#60a5fa');
+    const r = await fetch(`/accounts/api/accounts/${id}/sync`, {method:'POST'});
+    const d = await r.json();
+    if(d.logs) d.logs.forEach(l => addLog(l, l.includes('✅')?'#22c55e':l.includes('❌')?'#ef4444':'#e2e8f0'));
+    setTimeout(()=>location.reload(), 2000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}交易记录 - 交易复盘系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>📋 交易记录</h1>
+    <div class="header-actions">
+        <a href="/import/" class="btn">+ 导入数据</a>
+    </div>
+</div>
+
+<!-- 筛选 -->
+<div class="filter-bar">
+    <form method="get" class="filter-form">
+        <div class="filter-group">
+            <label>品种</label>
+            <select name="symbol" onchange="this.form.submit()">
+                <option value="">全部品种</option>
+                {% for s in symbols %}
+                <option value="{{ s }}" {% if current_symbol == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>方向</label>
+            <select name="type" onchange="this.form.submit()">
+                <option value="">全部</option>
+                <option value="buy" {% if current_type == 'buy' %}selected{% endif %}>Buy</option>
+                <option value="sell" {% if current_type == 'sell' %}selected{% endif %}>Sell</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>复盘状态</label>
+            <select name="reviewed" onchange="this.form.submit()">
+                <option value="">全部</option>
+                <option value="yes" {% if current_reviewed == 'yes' %}selected{% endif %}>已复盘</option>
+                <option value="no" {% if current_reviewed == 'no' %}selected{% endif %}>未复盘</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>排序</label>
+            <select name="sort" onchange="this.form.submit()">
+                <option value="close_time" {% if current_sort == 'close_time' %}selected{% endif %}>平仓时间</option>
+                <option value="open_time" {% if current_sort == 'open_time' %}selected{% endif %}>开仓时间</option>
+                <option value="profit" {% if current_sort == 'profit' %}selected{% endif %}>盈亏</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>顺序</label>
+            <select name="dir" onchange="this.form.submit()">
+                <option value="desc" {% if current_dir == 'desc' %}selected{% endif %}>降序</option>
+                <option value="asc" {% if current_dir == 'asc' %}selected{% endif %}>升序</option>
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- 订单列表 -->
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Ticket</th>
+                <th>品种</th>
+                <th>方向</th>
+                <th>手数</th>
+                <th>开仓时间</th>
+                <th>平仓时间</th>
+                <th>开仓价</th>
+                <th>平仓价</th>
+                <th>盈亏</th>
+                <th>持仓</th>
+                <th>复盘</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr class="{% if order.is_win %}row-win{% elif order.profit < 0 %}row-loss{% endif %}">
+                <td class="mono">{{ order.ticket }}</td>
+                <td><strong>{{ order.symbol }}</strong></td>
+                <td><span class="tag tag-{{ order.order_type }}">{{ order.order_type }}</span></td>
+                <td>{{ order.volume }}</td>
+                <td class="mono">{{ order.open_time }}</td>
+                <td class="mono">{{ order.close_time or '-' }}</td>
+                <td class="mono">{{ "%.5f"|format(order.open_price) if order.open_price else '-' }}</td>
+                <td class="mono">{{ "%.5f"|format(order.close_price) if order.close_price else '-' }}</td>
+                <td class="{% if order.profit >= 0 %}profit{% else %}loss{% endif %} mono bold">
+                    {{ "%.2f"|format(order.profit) }}
+                </td>
+                <td class="mono">{{ order.duration_minutes }}min</td>
+                <td>
+                    {% if order.is_reviewed %}
+                    <span class="tag tag-reviewed">✅已复盘</span>
+                    {% else %}
+                    <span class="tag tag-unreviewed">⏳待复盘</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if order.is_reviewed %}
+                    <a href="/review/order/{{ order.id }}" class="btn-sm">查看</a>
+                    {% else %}
+                    <a href="/review/order/{{ order.id }}" class="btn-sm btn-review">复盘</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="12" class="empty-state">暂无交易数据</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 分页 -->
+{% if pagination.pages > 1 %}
+<div class="pagination">
+    {% if pagination.has_prev %}
+    <a href="?page={{ pagination.prev_num }}&symbol={{ current_symbol }}&type={{ current_type }}&reviewed={{ current_reviewed }}&sort={{ current_sort }}&dir={{ current_dir }}" class="btn-sm">← 上一页</a>
+    {% endif %}
+    <span class="page-info">第 {{ pagination.page }} / {{ pagination.pages }} 页 (共 {{ pagination.total }} 条)</span>
+    {% if pagination.has_next %}
+    <a href="?page={{ pagination.next_num }}&symbol={{ current_symbol }}&type={{ current_type }}&reviewed={{ current_reviewed }}&sort={{ current_sort }}&dir={{ current_dir }}" class="btn-sm">下一页 →</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
