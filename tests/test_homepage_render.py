@@ -65,3 +65,16 @@ def test_homepage_renders_cockpit_ledger_content():
     assert "{%" not in html
     assert "{{" not in html
     assert "total_orders" not in html
+
+
+def test_mt4_export_files_are_downloadable():
+    app = create_app()
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    for filename in ("TradeExport.mq4", "AccountInfo.mq4"):
+        response = client.get(f"/mt4_export/{filename}")
+
+        assert response.status_code == 200
+        assert response.headers["Content-Disposition"].startswith("attachment;")
+        assert filename.encode() in response.data[:200]

@@ -133,6 +133,7 @@ http://127.0.0.1:5000
 | `AUTO_SYNC_ENABLED` | `true` | 是否启用后台自动同步 |
 | `AUTO_SYNC_INTERVAL` | `60` | 自动同步间隔，单位分钟 |
 | `AUTO_SYNC_STARTUP` | `true` | 启动时是否立即执行一次同步 |
+| `ALLOW_SERVER_TERMINAL_CONNECT` | `false` | 是否允许服务器进程访问服务器本机 MT4/MT5；服务器部署保持 false，使用本机客户端连接器 |
 
 示例：
 
@@ -164,6 +165,8 @@ python app.py
 
 注意：`client/config.ini` 是本地连接配置文件，已被 `.gitignore` 排除，不会提交到仓库。
 
+服务器部署时，网页里的 MT4/MT5 检测不会连接服务器上的交易终端。请在登录系统的那台电脑运行 `client/start.bat` 或对应脚本，让客户端读取本机 MT4/MT5 后通过 API Token 推送到服务器。
+
 ### MT5 直连
 
 MT5 相关功能依赖本机环境：
@@ -174,6 +177,8 @@ MT5 相关功能依赖本机环境：
 - 终端中已加载对应品种的历史数据
 
 如果 MT5 未运行或未登录，系统接口会返回连接失败或无数据提示。
+
+仅当系统是单机本地运行，或你明确希望服务器读取服务器本机终端时，才设置 `ALLOW_SERVER_TERMINAL_CONNECT=true`。
 
 ## 测试
 

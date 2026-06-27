@@ -30,3 +30,4 @@ class Config:
     AUTO_SYNC_ENABLED = os.environ.get('AUTO_SYNC_ENABLED', 'true').lower() == 'true'
     AUTO_SYNC_INTERVAL_MINUTES = int(os.environ.get('AUTO_SYNC_INTERVAL', '60'))
     AUTO_SYNC_ON_STARTUP = os.environ.get('AUTO_SYNC_STARTUP', 'true').lower() == 'true'
+    ALLOW_SERVER_TERMINAL_CONNECT = os.environ.get('ALLOW_SERVER_TERMINAL_CONNECT', 'false').lower() == 'true'

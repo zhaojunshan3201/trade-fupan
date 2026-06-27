@@ -224,6 +224,19 @@ async function testConnection() {
             return;
         }
 
+        if (data.status === 'client_connector_required') {
+            setStatus('pkg', false, '需要本机客户端');
+            setStatus('term', false, '远端网页不可直连');
+            setStatus('acct', false, '等待客户端推送');
+            setStatCard('mt5-pkg-status', '客户端模式', 'var(--warning)');
+            setStatCard('mt5-acct-status', '未连接', 'var(--text-dim)');
+            addMt5Log(data.message || data.error, 'warn');
+            addMt5Log('请到「账户管理」生成 API Token，并在登录系统的电脑运行 client/start.bat', 'info');
+            btn.disabled = false;
+            btn.textContent = '🔍 测试连接';
+            return;
+        }
+
         // 包状态
         if (data.package_installed) {
             setStatus('pkg', true, '✅ 已安装');
@@ -322,6 +335,16 @@ async function runImport(days) {
             importBtn.disabled = false;
             importBtn30.disabled = false;
             btn.textContent = days ? '📥 导入近30天' : '📥 一键导入全部历史';
+            return;
+        }
+
+        if (data.status === 'client_connector_required') {
+            setStatus('import', false, '需要本机客户端');
+            addMt5Log(data.message || data.error, 'warn');
+            addMt5Log('请在登录系统的电脑运行 client/start.bat 后同步 MT5 数据', 'info');
+            importBtn.disabled = false;
+            importBtn30.disabled = false;
+            btn.textContent = days ? '📥 导入最近30天' : '📥 一键导入全部历史';
             return;
         }
 

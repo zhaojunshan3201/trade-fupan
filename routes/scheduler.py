@@ -2,6 +2,7 @@
 import logging
 from datetime import datetime, timedelta
 from models import db, TradingAccount, PlatformConfig, Order
+from routes.terminal_access import allows_server_terminal_access
 
 logger = logging.getLogger('auto_sync')
 
@@ -29,6 +30,10 @@ def auto_sync_all(app):
 
     try:
         with app.app_context():
+            if not allows_server_terminal_access():
+                logger.info('Server terminal sync skipped; client connector is required')
+                return
+
             accounts = TradingAccount.query.filter_by(is_active=True).all()
             logger.info(f'Auto-sync start: {len(accounts)} active accounts')
 

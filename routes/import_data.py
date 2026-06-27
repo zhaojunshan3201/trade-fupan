@@ -8,6 +8,7 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from flask_login import login_required, current_user
 from config import Config
 from models import db, Order, AccountInfo
+from routes.terminal_access import allows_server_terminal_access, client_connector_required_response
 
 import_bp = Blueprint('import_data', __name__)
 
@@ -126,6 +127,9 @@ def mt5_connect():
 @import_bp.route('/api/mt5_test', methods=['POST'])
 def api_mt5_test():
     """测试 MT5 连接是否可用"""
+    if not allows_server_terminal_access():
+        return client_connector_required_response('MT5')
+
     try:
         return _do_mt5_test()
     except Exception as e:
@@ -200,6 +204,9 @@ def _do_mt5_test():
 @import_bp.route('/api/mt5_import', methods=['POST'])
 def api_mt5_import():
     """在服务端直接执行 MT5 导入"""
+    if not allows_server_terminal_access():
+        return client_connector_required_response('MT5')
+
     try:
         days = request.json.get('days', 0) if request.is_json else 0
     except Exception:
@@ -666,9 +673,36 @@ def mql4_push_account():
 
 
 @import_bp.route('/api/account_latest')
+@login_required
 def api_account_latest():
     """获取最新账户信息"""
-    info = AccountInfo.query.order_by(AccountInfo.recorded_at.desc()).first()
+    from models import TradingAccount
+
+    account_numbers = {
+        row[0]
+        for row in db.session.query(TradingAccount.account_number)
+        .filter_by(user_id=current_user.id)
+        .all()
+        if row[0] is not None
+    }
+    account_numbers.update(
+        row[0]
+        for row in db.session.query(Order.account_number)
+        .filter_by(user_id=current_user.id)
+        .filter(Order.account_number.isnot(None))
+        .all()
+        if row[0] is not None
+    )
+
+    if not account_numbers:
+        return jsonify(None)
+
+    info = (
+        AccountInfo.query
+        .filter(AccountInfo.number.in_(account_numbers))
+        .order_by(AccountInfo.recorded_at.desc())
+        .first()
+    )
     if info:
         return jsonify(info.to_dict())
     return jsonify(None)
@@ -677,6 +711,9 @@ def api_account_latest():
 @import_bp.route('/api/scan_csv')
 def api_scan_csv():
     """扫描 MT4 公共目录下的 CSV 文件并导入"""
+    if not allows_server_terminal_access():
+        return client_connector_required_response('MT4')
+
     import glob as glob_mod
 
     # MT4 公共数据目录路径

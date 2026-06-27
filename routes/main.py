@@ -1,10 +1,23 @@
 """主页路由"""
-from flask import Blueprint, render_template
+from pathlib import Path
+
+from flask import Blueprint, abort, render_template, send_from_directory
 from flask_login import login_required, current_user
 from models import db, User, Order, TradeReview, TradingPlan
 from sqlalchemy import func, desc
 
 main_bp = Blueprint('main', __name__)
+
+MT4_EXPORT_DIR = Path(__file__).resolve().parent.parent / 'mt4_export'
+MT4_EXPORT_FILES = {'TradeExport.mq4', 'AccountInfo.mq4', 'mql4_setup.md', 'README.md'}
+
+
+@main_bp.route('/mt4_export/<path:filename>')
+def download_mt4_export(filename):
+    """Download bundled MT4 export scripts."""
+    if filename not in MT4_EXPORT_FILES:
+        abort(404)
+    return send_from_directory(MT4_EXPORT_DIR, filename, as_attachment=True)
 
 
 @main_bp.route('/')

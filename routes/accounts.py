@@ -4,6 +4,7 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
 from models import db, PlatformConfig, TradingAccount, Order, AccountInfo
+from routes.terminal_access import allows_server_terminal_access, client_connector_required_response
 from werkzeug.security import generate_password_hash, check_password_hash
 
 accounts_bp = Blueprint('accounts', __name__, url_prefix='/accounts')
@@ -128,6 +129,9 @@ def test_platform(pid):
     result = {'status': 'testing', 'message': '', 'account': None}
 
     if p.platform_type == 'mt5':
+        if not allows_server_terminal_access():
+            return client_connector_required_response('MT5')
+
         try:
             import MetaTrader5 as mt5
             init = mt5.initialize(path=p.mt5_path) if p.mt5_path else mt5.initialize()
@@ -246,6 +250,11 @@ def sync_account(aid):
     db.session.commit()
 
     if platform.platform_type == 'mt5':
+        if not allows_server_terminal_access():
+            a.sync_status = 'error'
+            db.session.commit()
+            return client_connector_required_response('MT5')
+
         try:
             import MetaTrader5 as mt5
             path = platform.mt5_path or None
@@ -331,6 +340,9 @@ def test_account(aid):
 
     platform = a.platform
     if platform.platform_type == 'mt5':
+        if not allows_server_terminal_access():
+            return client_connector_required_response('MT5')
+
         try:
             import MetaTrader5 as mt5
             init = mt5.initialize(path=platform.mt5_path) if platform.mt5_path else mt5.initialize()

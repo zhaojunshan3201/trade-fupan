@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from flask_login import login_required, current_user
 from models import db, Order, TradeReview
+from routes.terminal_access import allows_server_terminal_access
 
 review_bp = Blueprint('review', __name__)
 
@@ -214,30 +215,31 @@ def api_candles(order_id):
 
     # 尝试从 MT5 获取数据
     candles = []
-    source = 'none'
+    source = 'client connector required'
 
-    try:
-        import MetaTrader5 as mt5
-        initialized = mt5.initialize()
-        if initialized:
-            rates = mt5.copy_rates_range(order.symbol, tf, start_dt, end_dt)
-            if rates is not None and len(rates) > 0:
-                source = 'mt5'
-                for r in rates:
-                    # MT5 返回 numpy.void，用属性/下标访问
-                    candles.append({
-                        'time': int(r[0]),   # time
-                        'open': round(float(r[1]), 5),   # open
-                        'high': round(float(r[2]), 5),   # high
-                        'low': round(float(r[3]), 5),    # low
-                        'close': round(float(r[4]), 5),  # close
-                        'volume': int(r[5]) if len(r) > 5 else 0,  # tick_volume
-                    })
-            mt5.shutdown()
-    except ImportError:
-        source = 'Error: MetaTrader5 not installed'
-    except Exception as e:
-        source = f'MT5 error: {e}'
+    if allows_server_terminal_access():
+        try:
+            import MetaTrader5 as mt5
+            initialized = mt5.initialize()
+            if initialized:
+                rates = mt5.copy_rates_range(order.symbol, tf, start_dt, end_dt)
+                if rates is not None and len(rates) > 0:
+                    source = 'mt5'
+                    for r in rates:
+                        # MT5 返回 numpy.void，用属性/下标访问
+                        candles.append({
+                            'time': int(r[0]),   # time
+                            'open': round(float(r[1]), 5),   # open
+                            'high': round(float(r[2]), 5),   # high
+                            'low': round(float(r[3]), 5),    # low
+                            'close': round(float(r[4]), 5),  # close
+                            'volume': int(r[5]) if len(r) > 5 else 0,  # tick_volume
+                        })
+                mt5.shutdown()
+        except ImportError:
+            source = 'Error: MetaTrader5 not installed'
+        except Exception as e:
+            source = f'MT5 error: {e}'
 
     if not candles:
         return jsonify({
