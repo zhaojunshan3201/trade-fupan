@@ -15,6 +15,48 @@ CLIENT_DIR = Path(__file__).resolve().parent.parent / 'client'
 CLIENT_DOWNLOAD_FILES = {'start.bat', 'mt5_push.py', 'mt4_push.py'}
 
 
+def _direct_start_bat(script_name, label, dependency_check, dependency_install):
+    return (
+        '@echo off\r\n'
+        'chcp 65001 >nul\r\n'
+        f'title 交易复盘 {label} 客户端\r\n'
+        'cd /d %~dp0\r\n'
+        'set "LOG=%~dp0connector.log"\r\n'
+        f'echo [%date% %time%] {script_name} launched > "%LOG%"\r\n'
+        f'if not exist "%~dp0{script_name}" (\r\n'
+        f'    echo 未找到 {script_name}，请先解压 zip 后再运行。\r\n'
+        '    pause\r\n'
+        '    exit /b 1\r\n'
+        ')\r\n'
+        'set "PYTHON_CMD=python"\r\n'
+        'python --version >nul 2>&1\r\n'
+        'if %errorlevel% neq 0 (\r\n'
+        '    py -3 --version >nul 2>&1\r\n'
+        '    if %errorlevel% equ 0 set "PYTHON_CMD=py -3"\r\n'
+        ')\r\n'
+        '%PYTHON_CMD% --version >nul 2>&1\r\n'
+        'if %errorlevel% neq 0 (\r\n'
+        '    echo 未检测到 Python，请先安装 Python 3.7+ 并勾选 Add Python to PATH。\r\n'
+        '    pause\r\n'
+        '    exit /b 1\r\n'
+        ')\r\n'
+        f'%PYTHON_CMD% -c "{dependency_check}" >nul 2>&1\r\n'
+        'if %errorlevel% neq 0 (\r\n'
+        '    echo 正在安装依赖...\r\n'
+        f'    %PYTHON_CMD% -m pip install --user {dependency_install}\r\n'
+        '    if %errorlevel% neq 0 (\r\n'
+        '        echo 依赖安装失败，请检查网络。\r\n'
+        '        pause\r\n'
+        '        exit /b 1\r\n'
+        '    )\r\n'
+        ')\r\n'
+        f'%PYTHON_CMD% {script_name}\r\n'
+        'echo.\r\n'
+        'echo 如果上方有错误，请把 connector.log 发给管理员排查。\r\n'
+        'pause\r\n'
+    )
+
+
 # ============================================================
 # 页面
 # ============================================================
@@ -99,15 +141,25 @@ def download_client_package():
     with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
         for filename in CLIENT_DOWNLOAD_FILES:
             zf.write(CLIENT_DIR / filename, arcname=filename)
+        zf.writestr(
+            'start_mt5.bat',
+            _direct_start_bat('mt5_push.py', 'MT5', 'import MetaTrader5, requests', 'MetaTrader5 requests'),
+        )
+        zf.writestr(
+            'start_mt4.bat',
+            _direct_start_bat('mt4_push.py', 'MT4', 'import requests', 'requests'),
+        )
         zf.writestr('config.ini', _client_config())
         zf.writestr(
             'README.txt',
             '一键连接包使用方法:\r\n'
             '1. 解压本压缩包到当前电脑\r\n'
             '2. 确认本机 MT4/MT5 已打开并登录账户\r\n'
-            '3. 双击 start.bat\r\n'
-            '4. 选择 MT5 自动连接或 MT4 CSV 监控\r\n'
-            '5. 如一台电脑有多个 MT5，请编辑 config.ini 的 mt5_path\r\n'
+            '3. MT5 用户可双击 start_mt5.bat\r\n'
+            '4. MT4 用户可双击 start_mt4.bat\r\n'
+            '5. 也可以双击 start.bat 打开菜单\r\n'
+            '6. 如一台电脑有多个 MT5，请编辑 config.ini 的 mt5_path\r\n'
+            '7. 如窗口仍然退出，请查看 connector.log\r\n'
         )
     buffer.seek(0)
     return send_file(

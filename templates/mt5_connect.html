@@ -43,28 +43,31 @@
     <!-- 主操作面板 -->
     <div class="card wide">
         <div class="card-header">
-            <h2>⚡ MT5 一键导入</h2>
-            <span class="tag tag-completed">官方直连</span>
+            <h2>⚡ MT5 本机客户端导入</h2>
+            <span class="tag tag-completed">服务器部署推荐</span>
         </div>
         <div class="card-body">
             <div class="method-description">
                 <p style="font-weight:600;color:var(--profit);font-size:15px">
-                    ✅ 点击下方按钮直接连接 MT5，无需手动运行脚本
+                    ✅ 服务器部署时，请下载一键连接包，在登录系统的电脑上运行本机客户端读取 MT5。
                 </p>
             </div>
 
             <!-- 操作按钮 -->
             <div class="action-bar">
+                <a class="btn btn-primary btn-lg" href="/accounts/">
+                    📦 去账户管理下载一键连接包
+                </a>
                 <button class="btn btn-primary btn-lg" onclick="testConnection()" id="btnTest">
-                    🔍 测试连接
+                    🔍 本机部署测试连接
                 </button>
                 <button class="btn btn-lg" onclick="runImport()" id="btnImport" disabled>
-                    📥 一键导入全部历史
+                    📥 本机部署导入全部历史
                 </button>
                 <button class="btn btn-lg" onclick="runImport(30)" id="btnImport30" disabled>
-                    📥 导入最近30天
+                    📥 本机部署导入最近30天
                 </button>
-                <span class="hint" id="importHint">请先测试连接</span>
+                <span class="hint" id="importHint">服务器部署请使用一键连接包</span>
             </div>
 
             <!-- 连接详情 -->
@@ -150,7 +153,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     addMt5Log('🟢 MT5 连接页面已加载', 'info');
-    addMt5Log('点击"测试连接"检查 MT5 状态', 'info');
+    addMt5Log('服务器部署模式下，请到「账户管理」下载一键连接包', 'info');
     loadOrdersCount();
 });
 
@@ -220,7 +223,7 @@ async function testConnection() {
             const text = await res.text();
             addMt5Log(`❌ 服务器返回非JSON: ${text.substring(0,200)}`, 'error');
             btn.disabled = false;
-            btn.textContent = '🔍 测试连接';
+            btn.textContent = '🔍 本机部署测试连接';
             return;
         }
 
@@ -231,9 +234,9 @@ async function testConnection() {
             setStatCard('mt5-pkg-status', '客户端模式', 'var(--warning)');
             setStatCard('mt5-acct-status', '未连接', 'var(--text-dim)');
             addMt5Log(data.message || data.error, 'warn');
-            addMt5Log('请到「账户管理」生成 API Token，并在登录系统的电脑运行 client/start.bat', 'info');
+            addMt5Log('请到「账户管理」下载一键连接包，解压后运行 start_mt5.bat 或 start.bat', 'info');
             btn.disabled = false;
-            btn.textContent = '🔍 测试连接';
+            btn.textContent = '🔍 本机部署测试连接';
             return;
         }
 
@@ -248,7 +251,7 @@ async function testConnection() {
             addMt5Log('❌ MetaTrader5 包未安装', 'error');
             addMt5Log('💡 请运行: pip install MetaTrader5', 'warn');
             btn.disabled = false;
-            btn.textContent = '🔍 测试连接';
+            btn.textContent = '🔍 本机部署测试连接';
             return;
         }
 
@@ -262,7 +265,7 @@ async function testConnection() {
             addMt5Log('❌ MT5 终端未运行或无法连接', 'error');
             addMt5Log('💡 ' + (data.error || '请确保MT5已打开并登录'), 'warn');
             btn.disabled = false;
-            btn.textContent = '🔍 测试连接';
+            btn.textContent = '🔍 本机部署测试连接';
             return;
         }
 
@@ -301,7 +304,7 @@ async function testConnection() {
         addMt5Log('💡 请确保 Flask 服务运行正常', 'warn');
     } finally {
         btn.disabled = false;
-        btn.textContent = '🔍 测试连接';
+        btn.textContent = '🔍 本机部署测试连接';
     }
 }
 
@@ -334,17 +337,17 @@ async function runImport(days) {
             setStatus('import', false, '❌ 服务器错误');
             importBtn.disabled = false;
             importBtn30.disabled = false;
-            btn.textContent = days ? '📥 导入近30天' : '📥 一键导入全部历史';
+            btn.textContent = days ? '📥 本机部署导入最近30天' : '📥 本机部署导入全部历史';
             return;
         }
 
         if (data.status === 'client_connector_required') {
             setStatus('import', false, '需要本机客户端');
             addMt5Log(data.message || data.error, 'warn');
-            addMt5Log('请在登录系统的电脑运行 client/start.bat 后同步 MT5 数据', 'info');
+            addMt5Log('请在登录系统的电脑运行一键连接包中的 start_mt5.bat 后同步 MT5 数据', 'info');
             importBtn.disabled = false;
             importBtn30.disabled = false;
-            btn.textContent = days ? '📥 导入最近30天' : '📥 一键导入全部历史';
+            btn.textContent = days ? '📥 本机部署导入最近30天' : '📥 本机部署导入全部历史';
             return;
         }
 
@@ -373,7 +376,7 @@ async function runImport(days) {
     } finally {
         importBtn.disabled = false;
         importBtn30.disabled = false;
-        btn.textContent = days ? '📥 导入近30天' : '📥 一键导入全部历史';
+        btn.textContent = days ? '📥 本机部署导入最近30天' : '📥 本机部署导入全部历史';
     }
 }
 
@@ -389,9 +392,14 @@ async function checkMetaTrader5Package() {
     try {
         const res = await fetch('/import/api/mt5_test', { method: 'POST' });
         const data = await res.json();
+        if (data.status === 'client_connector_required') {
+            addMt5Log(data.message || data.error, 'warn');
+            addMt5Log('服务器部署请到「账户管理」下载一键连接包', 'info');
+            return;
+        }
         if (data.package_installed) {
             addMt5Log('✅ MetaTrader5 已安装', 'success');
-            addMt5Log('💡 点击"测试连接"连接 MT5 终端', 'info');
+            addMt5Log('💡 本机部署时可点击测试连接；服务器部署请用一键连接包', 'info');
         } else {
             addMt5Log('❌ MetaTrader5 未安装', 'error');
             addMt5Log('💡 运行: pip install MetaTrader5', 'warn');

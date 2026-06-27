@@ -217,8 +217,19 @@ def test_client_package_includes_current_server_and_token(client):
 
     archive = zipfile.ZipFile(BytesIO(response.data))
     names = set(archive.namelist())
-    assert {"start.bat", "mt5_push.py", "mt4_push.py", "config.ini"} <= names
+    assert {
+        "start.bat",
+        "start_mt5.bat",
+        "start_mt4.bat",
+        "mt5_push.py",
+        "mt4_push.py",
+        "config.ini",
+    } <= names
 
     config = archive.read("config.ini").decode("utf-8")
     assert "url = http://59.110.12.91:5000" in config
     assert "token = alice-token" in config
+
+    start_mt4 = archive.read("start_mt4.bat").decode("utf-8")
+    assert "MetaTrader5" not in start_mt4
+    assert "pip install --user requests" in start_mt4
