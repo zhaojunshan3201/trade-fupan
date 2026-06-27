@@ -55,8 +55,8 @@
 - 支持 MT4 标准 CSV 上传导入
 - 支持 MQL4/客户端脚本通过 API 推送交易记录
 - 支持账户信息推送和最新账户快照查询
-- 支持 MT4 公共目录 CSV 扫描
-- 支持 MT5 官方 Python API 测试连接和导入历史成交
+- 本地单机运行时支持 MT4 公共目录 CSV 扫描
+- 本地单机运行时支持 MT5 官方 Python API 测试连接和导入历史成交
 - 提供 MT4 导出脚本、MT4 连接辅助脚本、MT5 连接脚本和本地客户端工具
 
 ### 账户管理
@@ -145,6 +145,34 @@ python app.py
 ```
 
 ## 常见使用流程
+
+### 服务器部署模式：连接当前电脑的 MT4/MT5
+
+如果系统部署在服务器上，浏览器里的“MT4连接 / MT5连接”不会直接连接服务器上的交易终端，也不会通过网页自动读取你电脑里的终端。正确方式是：
+
+1. 在网页登录系统
+2. 进入“账户管理”
+3. 生成当前用户的 API Token
+4. 在你正在使用的电脑上运行 `client/start.bat`
+5. 选择 MT5 或 MT4，并填写服务器地址和 API Token
+6. 客户端读取这台电脑上已打开、已登录的 MT4/MT5 账户，并推送到服务器
+
+也就是说，数据归属由 API Token 决定，连接的交易终端由“运行客户端连接器的电脑”决定。用户在哪台电脑运行客户端连接器，就会读取哪台电脑上的 MT4/MT5。
+
+MT5 客户端默认连接本机当前可检测到的 MT5 终端。如果一台电脑同时安装或打开多个 MT5，可以在 `client/config.ini` 里设置 `mt5_path`，指定要连接的 `terminal64.exe`。
+
+MT4 推荐使用脚本或客户端推送：
+
+- 下载 `TradeExport.mq4`：`/mt4_export/TradeExport.mq4`
+- 下载 `AccountInfo.mq4`：`/mt4_export/AccountInfo.mq4`
+- 将脚本复制到 MT4 的 `MQL4\Scripts` 目录，编译后运行
+
+公网示例：
+
+```text
+http://59.110.12.91:5000/mt4_export/TradeExport.mq4
+http://59.110.12.91:5000/mt4_export/AccountInfo.mq4
+```
 
 ### CSV 导入交易记录
 
