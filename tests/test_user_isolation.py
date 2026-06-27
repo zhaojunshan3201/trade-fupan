@@ -1,5 +1,6 @@
 import os
 from io import BytesIO
+import zipfile
 from datetime import datetime
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
@@ -187,3 +188,37 @@ def test_csv_upload_accepts_api_token_for_client_push(client, app):
     with app.app_context():
         order = Order.query.filter_by(ticket=3001).one()
         assert order.user_id == 1
+
+
+def test_client_script_downloads_are_available_after_login(client):
+    login_as(client, 1)
+
+    for filename in ("start.bat", "mt5_push.py", "mt4_push.py"):
+        response = client.get(f"/accounts/client/{filename}")
+
+        assert response.status_code == 200
+        assert response.headers["Content-Disposition"].startswith("attachment;")
+        assert response.data
+
+
+def test_client_package_includes_current_server_and_token(client):
+    login_as(client, 1)
+
+    response = client.get(
+        "/accounts/client/package.zip",
+        headers={
+            "X-Forwarded-Host": "59.110.12.91:5000",
+            "X-Forwarded-Proto": "http",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["Content-Disposition"].startswith("attachment;")
+
+    archive = zipfile.ZipFile(BytesIO(response.data))
+    names = set(archive.namelist())
+    assert {"start.bat", "mt5_push.py", "mt4_push.py", "config.ini"} <= names
+
+    config = archive.read("config.ini").decode("utf-8")
+    assert "url = http://59.110.12.91:5000" in config
+    assert "token = alice-token" in config

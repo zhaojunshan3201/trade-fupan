@@ -23,7 +23,7 @@
     </div>
     <div class="card-body">
         <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">
-            ⚠️ 服务器部署后，需要在你电脑上运行客户端连接器，自动读取本地MT4/MT5数据推送到服务器。
+            ⚠️ 服务器部署后，需要在你电脑上运行客户端连接器，自动读取本地MT4/MT5数据推送到服务器。API Token 用来确认数据归属到当前登录用户。
         </p>
         <div class="form-row three-col">
             <div class="form-group">
@@ -36,20 +36,24 @@
             </div>
             <div class="form-group">
                 <label class="form-label">服务器地址</label>
-                <input id="serverUrl" class="form-input mono" value="http://127.0.0.1:5000" readonly>
+                <input id="serverUrl" class="form-input mono" value="{{ request.url_root.rstrip('/') }}" readonly>
             </div>
             <div class="form-group">
-                <label class="form-label">客户端下载</label>
-                <a href="/static/../client/start.bat" class="btn btn-sm">📥 start.bat</a>
-                <a href="/static/../client/mt5_push.py" class="btn btn-sm">📥 MT5脚本</a>
-                <a href="/static/../client/mt4_push.py" class="btn btn-sm">📥 MT4脚本</a>
+                <label class="form-label">一键连接包</label>
+                <a href="/accounts/client/package.zip" class="btn btn-primary btn-sm">📦 下载一键连接包</a>
+                <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+                    <a href="/accounts/client/start.bat" class="btn btn-sm">start.bat</a>
+                    <a href="/accounts/client/mt5_push.py" class="btn btn-sm">MT5脚本</a>
+                    <a href="/accounts/client/mt4_push.py" class="btn btn-sm">MT4脚本</a>
+                </div>
             </div>
         </div>
         <div class="code-block" style="margin-top:12px;font-size:12px">
-<pre>:: 1. 下载 client/ 文件夹到你的电脑
-:: 2. 编辑 config.ini，填入 API Token 和服务器地址
-:: 3. 双击 start.bat 启动
-:: 4. 可选：设置开机自启 (Win+R → shell:startup → 放快捷方式)</pre>
+<pre>:: 1. 下载“一键连接包”到当前电脑
+:: 2. 解压 zip
+:: 3. 双击 start.bat
+:: 4. 选择 MT5 自动连接或 MT4 CSV 监控
+:: 可选：设置开机自启 (Win+R → shell:startup → 放快捷方式)</pre>
         </div>
     </div>
 </div>

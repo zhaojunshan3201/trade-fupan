@@ -1,13 +1,18 @@
 """平台账户管理路由"""
+import io
 import uuid
+import zipfile
 from datetime import datetime
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+from pathlib import Path
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, send_file, send_from_directory
 from flask_login import login_required, current_user
 from models import db, PlatformConfig, TradingAccount, Order, AccountInfo
 from routes.terminal_access import allows_server_terminal_access, client_connector_required_response
 from werkzeug.security import generate_password_hash, check_password_hash
 
 accounts_bp = Blueprint('accounts', __name__, url_prefix='/accounts')
+CLIENT_DIR = Path(__file__).resolve().parent.parent / 'client'
+CLIENT_DOWNLOAD_FILES = {'start.bat', 'mt5_push.py', 'mt4_push.py'}
 
 
 # ============================================================
@@ -46,6 +51,71 @@ def manage_token():
         db.session.commit()
         return jsonify({'status': 'ok', 'token': current_user.api_token})
     return jsonify({'token': current_user.api_token})
+
+
+def _ensure_api_token():
+    if not current_user.api_token:
+        current_user.api_token = uuid.uuid4().hex[:32]
+        db.session.commit()
+    return current_user.api_token
+
+
+def _server_url():
+    forwarded_host = request.headers.get('X-Forwarded-Host')
+    if forwarded_host:
+        proto = request.headers.get('X-Forwarded-Proto', request.scheme)
+        return f'{proto}://{forwarded_host}'.rstrip('/')
+    return request.url_root.rstrip('/')
+
+
+def _client_config():
+    return (
+        '[server]\n'
+        f'url = {_server_url()}\n'
+        f'token = {_ensure_api_token()}\n'
+        'sync_interval_minutes = 30\n'
+        'sync_days_back = 7\n'
+        'watch_dir = \n'
+        'mt5_path = \n'
+    )
+
+
+@accounts_bp.route('/client/<path:filename>')
+@login_required
+def download_client_file(filename):
+    """Download a single local connector script."""
+    if filename == 'package.zip':
+        return download_client_package()
+    if filename not in CLIENT_DOWNLOAD_FILES:
+        return jsonify({'status': 'error', 'message': '文件不存在'}), 404
+    return send_from_directory(CLIENT_DIR, filename, as_attachment=True)
+
+
+@accounts_bp.route('/client/package.zip')
+@login_required
+def download_client_package():
+    """Download a ready-to-run client connector package."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for filename in CLIENT_DOWNLOAD_FILES:
+            zf.write(CLIENT_DIR / filename, arcname=filename)
+        zf.writestr('config.ini', _client_config())
+        zf.writestr(
+            'README.txt',
+            '一键连接包使用方法:\r\n'
+            '1. 解压本压缩包到当前电脑\r\n'
+            '2. 确认本机 MT4/MT5 已打开并登录账户\r\n'
+            '3. 双击 start.bat\r\n'
+            '4. 选择 MT5 自动连接或 MT4 CSV 监控\r\n'
+            '5. 如一台电脑有多个 MT5，请编辑 config.ini 的 mt5_path\r\n'
+        )
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name='trade-journal-client.zip',
+    )
 
 
 @accounts_bp.route('/api/sync_all', methods=['POST'])
