@@ -9,6 +9,7 @@ os.environ["AUTO_SYNC_ENABLED"] = "false"
 import pytest
 
 from app import create_app
+from mt4_connect import mt4_zmq_bridge
 from models import db, Order, PlatformConfig, TradeReview, TradingPlan, TradingAccount, User
 
 
@@ -407,6 +408,44 @@ def test_mql_push_updates_existing_open_order_when_closed(client, app):
         assert order.close_time == datetime(2026, 6, 29, 23, 13, 36)
         assert order.close_price == 3990.10
         assert order.profit == 120.50
+
+
+def test_mt4_zmq_bridge_pushes_order_with_account_number(monkeypatch):
+    pushed = []
+
+    monkeypatch.setattr(mt4_zmq_bridge, "push_orders", lambda orders: pushed.extend(orders))
+
+    mt4_zmq_bridge.process_order_data({
+        "ticket": 284125007,
+        "symbol": "XAUUSD",
+        "Type": "sell",
+        "volume": 0.38,
+        "open_price": 4012.75,
+        "close_price": 4019.46,
+        "open_time": "2026.06.29 17:13:33",
+        "close_time": "",
+        "profit": -254.98,
+        "account_number": 1246398492,
+    })
+
+    assert pushed == [{
+        "ticket": 284125007,
+        "symbol": "XAUUSD",
+        "type": "sell",
+        "volume": 0.38,
+        "open_price": 4012.75,
+        "close_price": 4019.46,
+        "open_time": "2026.06.29 17:13:33",
+        "close_time": "",
+        "profit": -254.98,
+        "sl": 0,
+        "tp": 0,
+        "commission": 0,
+        "swap": 0,
+        "comment": "",
+        "magic": 0,
+        "account_number": 1246398492,
+    }]
 
 
 def test_client_script_downloads_are_available_after_login(client):

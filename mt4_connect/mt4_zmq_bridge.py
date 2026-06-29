@@ -113,6 +113,7 @@ def process_order_data(order_data):
         'swap': order_data.get('swap', order_data.get('Swap', 0)),
         'comment': order_data.get('comment', order_data.get('Comment', '')),
         'magic': order_data.get('magic', order_data.get('Magic', order_data.get('MagicNumber', 0))),
+        'account_number': order_data.get('account_number', order_data.get('AccountNumber')),
     }
 
     # 推送单条
@@ -155,9 +156,9 @@ def start_bridge(port=5555, host='127.0.0.1'):
     socket.connect(address)
     logger.info(f"🔌 正在连接 ZeroMQ: {address}")
 
-    # 订阅所有主题 (空字符串 = 全部)
-    socket.subscribe(b'')
-    logger.info("📡 已订阅所有数据通道")
+    for topic in (b'ACCOUNT', b'ORDER', b'DEAL', b'TICK', b'HEARTBEAT'):
+        socket.subscribe(topic)
+    logger.info("📡 已订阅 ACCOUNT/ORDER/DEAL 数据通道")
     logger.info(f"📤 推送目标: {FLASK_URL}")
     logger.info("⏳ 等待 MT4 数据...")
 
@@ -174,17 +175,23 @@ def start_bridge(port=5555, host='127.0.0.1'):
 
             # 接收消息 (超时5秒以便能响应 Ctrl+C)
             try:
-                topic = socket.recv_string(flags=zmq.NOBLOCK)
-                message = socket.recv(flags=zmq.NOBLOCK)
+                frames = socket.recv_multipart(flags=zmq.NOBLOCK)
                 last_heartbeat = time.time()
             except zmq.Again:
                 time.sleep(0.1)
                 continue
+            if len(frames) < 2:
+                logger.debug(f"收到不完整 ZeroMQ 消息: {len(frames)} 帧")
+                continue
+
+            topic = frames[0].decode('utf-8', errors='replace')
+            message = frames[1]
 
             data = parse_zmq_message(topic, message)
             msg_type = data.get('type', topic)
 
             if msg_type in ('ORDER', 'DEAL', 'order', 'deal'):
+                logger.info(f"收到订单消息: topic={topic} ticket={data.get('ticket', data.get('Ticket', 'N/A'))}")
                 process_order_data(data)
             elif msg_type in ('ACCOUNT', 'account', 'ACCOUNT_INFO'):
                 process_account_data(data)

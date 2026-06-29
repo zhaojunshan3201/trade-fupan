@@ -112,7 +112,7 @@ bool PublishOrder()
    payload += "\"tp\":" + DoubleToString(OrderTakeProfit(), Digits) + ",";
    payload += "\"commission\":" + DoubleToString(OrderCommission(), 2) + ",";
    payload += "\"swap\":" + DoubleToString(OrderSwap(), 2) + ",";
-   payload += "\"comment\":" + JsonString(OrderComment()) + ",";
+   payload += "\"comment\":\"\",";
    payload += "\"magic\":" + IntegerToString(OrderMagicNumber()) + ",";
    payload += "\"account_number\":" + IntegerToString(AccountNumber());
    payload += "}";
