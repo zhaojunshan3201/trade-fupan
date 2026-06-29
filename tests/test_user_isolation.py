@@ -109,6 +109,46 @@ def test_order_detail_does_not_expose_another_users_order(client):
     assert response.status_code == 404
 
 
+def test_order_api_list_can_filter_by_current_users_account(client, app):
+    login_as(client, 1)
+    with app.app_context():
+        db.session.add(
+            Order(
+                ticket=1002,
+                user_id=1,
+                symbol="USDJPY",
+                order_type="sell",
+                volume=0.1,
+                open_time=datetime.utcnow(),
+                close_time=datetime.utcnow(),
+                open_price=150.0,
+                close_price=149.5,
+                profit=50,
+                account_number=333,
+            )
+        )
+        db.session.commit()
+
+    response = client.get("/orders/api/list?account=111")
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["total"] == 1
+    assert [order["account_number"] for order in data["orders"]] == [111]
+    assert [order["ticket"] for order in data["orders"]] == [1001]
+
+
+def test_order_page_account_options_are_scoped_to_current_user(client):
+    login_as(client, 1)
+
+    response = client.get("/orders/")
+
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+    assert 'value="111"' in html
+    assert 'value="222"' not in html
+
+
 def test_order_delete_info_reports_review_for_owned_order(client):
     login_as(client, 2)
 

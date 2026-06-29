@@ -1,25 +1,54 @@
-"""订单列表与详情路由"""
-from flask import Blueprint, render_template, jsonify, request
-from flask_login import login_required, current_user
-from models import Order, TradeReview, db
+"""Order list, detail, and deletion routes."""
+from flask import Blueprint, jsonify, render_template, request
+from flask_login import current_user, login_required
+
+from models import Order, db
 
 orders_bp = Blueprint('orders', __name__)
+
+
+def _parse_account_filter(value):
+    if not value:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return -1
+
+
+def _account_options_for_user(user_id):
+    rows = (
+        db.session.query(Order.account_number)
+        .filter_by(user_id=user_id)
+        .filter(Order.account_number.isnot(None))
+        .distinct()
+        .order_by(Order.account_number.asc())
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
+def _apply_account_filter(query, account):
+    account_number = _parse_account_filter(account)
+    if account_number is None:
+        return query
+    return query.filter(Order.account_number == account_number)
 
 
 @orders_bp.route('/')
 @login_required
 def order_list():
-    """订单列表页面"""
     uid = current_user.id
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+    account = request.args.get('account', '')
     symbol = request.args.get('symbol', '')
     order_type = request.args.get('type', '')
     reviewed = request.args.get('reviewed', '')
     sort_by = request.args.get('sort', 'close_time')
     sort_dir = request.args.get('dir', 'desc')
 
-    query = Order.query.filter_by(user_id=uid)
+    query = _apply_account_filter(Order.query.filter_by(user_id=uid), account)
 
     if symbol:
         query = query.filter(Order.symbol == symbol)
@@ -30,23 +59,25 @@ def order_list():
     elif reviewed == 'no':
         query = query.filter(~Order.review.has())
 
-    # 排序
     sort_col = getattr(Order, sort_by, Order.close_time)
-    if sort_dir == 'asc':
-        query = query.order_by(sort_col.asc())
-    else:
-        query = query.order_by(sort_col.desc())
+    query = query.order_by(sort_col.asc() if sort_dir == 'asc' else sort_col.desc())
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    orders = [o.to_dict() for o in pagination.items]
+    symbols = [
+        row[0]
+        for row in db.session.query(Order.symbol)
+        .filter_by(user_id=uid)
+        .distinct()
+        .all()
+    ]
 
-    # 获取所有品种列表用于筛选
-    symbols = [r[0] for r in db.session.query(Order.symbol).filter_by(user_id=uid).distinct().all()]
-
-    return render_template('orders.html',
-        orders=orders,
+    return render_template(
+        'orders.html',
+        orders=[order.to_dict() for order in pagination.items],
         pagination=pagination,
         symbols=symbols,
+        account_options=_account_options_for_user(uid),
+        current_account=account,
         current_symbol=symbol,
         current_type=order_type,
         current_reviewed=reviewed,
@@ -58,15 +89,18 @@ def order_list():
 @orders_bp.route('/api/list')
 @login_required
 def order_api_list():
-    """订单列表 API"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+    account = request.args.get('account', '')
 
-    query = Order.query.filter_by(user_id=current_user.id).order_by(Order.close_time.desc())
+    query = _apply_account_filter(
+        Order.query.filter_by(user_id=current_user.id),
+        account,
+    ).order_by(Order.close_time.desc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
     return jsonify({
-        'orders': [o.to_dict() for o in pagination.items],
+        'orders': [order.to_dict() for order in pagination.items],
         'total': pagination.total,
         'pages': pagination.pages,
         'page': page,
@@ -76,7 +110,6 @@ def order_api_list():
 @orders_bp.route('/detail/<int:order_id>')
 @login_required
 def order_detail(order_id):
-    """订单详情"""
     query = Order.query.filter_by(id=order_id)
     if not current_user.is_admin:
         query = query.filter_by(user_id=current_user.id)
@@ -87,7 +120,6 @@ def order_detail(order_id):
 @orders_bp.route('/api/<int:order_id>/delete_info')
 @login_required
 def order_delete_info(order_id):
-    """Return deletion warning details for the current user's order."""
     order = Order.query.filter_by(id=order_id, user_id=current_user.id).first_or_404()
     return jsonify({
         'id': order.id,
@@ -99,7 +131,6 @@ def order_delete_info(order_id):
 @orders_bp.route('/api/<int:order_id>', methods=['DELETE'])
 @login_required
 def order_delete(order_id):
-    """Delete one order owned by the current user."""
     order = Order.query.filter_by(id=order_id, user_id=current_user.id).first_or_404()
     deleted_review = order.review is not None
     db.session.delete(order)
@@ -114,7 +145,6 @@ def order_delete(order_id):
 @orders_bp.route('/api/bulk_delete', methods=['POST'])
 @login_required
 def order_bulk_delete():
-    """Delete selected orders owned by the current user."""
     data = request.get_json(silent=True) or {}
     raw_ids = data.get('ids') or []
     order_ids = []
