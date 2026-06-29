@@ -61,10 +61,14 @@ def process_order_data(order_data):
     if not isinstance(order_data, dict):
         return
 
+    trade_type = order_data.get('Type', order_data.get('order_type', order_data.get('side', '')))
+    if not trade_type and str(order_data.get('type', '')).lower() not in ('deal', 'order'):
+        trade_type = order_data.get('type', '')
+
     normalized = {
         'ticket': order_data.get('ticket', order_data.get('Ticket', 0)),
         'symbol': order_data.get('symbol', order_data.get('Symbol', '')),
-        'type': order_data.get('type', order_data.get('Type', '')).lower(),
+        'type': str(trade_type).lower(),
         'volume': order_data.get('volume', order_data.get('Volume', 0)),
         'open_price': order_data.get('open_price', order_data.get('OpenPrice', order_data.get('price', 0))),
         'close_price': order_data.get('close_price', order_data.get('ClosePrice', order_data.get('price', 0))),

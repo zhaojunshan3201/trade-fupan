@@ -168,3 +168,23 @@ def test_mt5_zmq_bridge_tags_account_as_mt5(monkeypatch):
     assert captured["number"] == 60102506
     assert captured["terminal"] == "MetaTrader 5"
     assert captured["terminal_type"] == "mt5"
+
+
+def test_mt5_zmq_bridge_uses_trade_type_not_message_type(monkeypatch):
+    import mt5_connect.mt5_zmq_bridge as bridge
+
+    captured = []
+    monkeypatch.setattr(bridge, "push_orders", lambda orders: captured.extend(orders))
+
+    bridge.process_order_data({
+        "type": "DEAL",
+        "Type": "buy",
+        "ticket": 294202731,
+        "symbol": "AUDCAD",
+        "volume": 1.29,
+        "open_price": 0.97779,
+        "close_price": 0.97779,
+        "account_number": 60109377,
+    })
+
+    assert captured[0]["type"] == "buy"
