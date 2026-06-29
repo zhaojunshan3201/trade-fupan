@@ -101,6 +101,7 @@
                     {% else %}
                     <a href="/review/order/{{ order.id }}" class="btn-sm btn-review">复盘</a>
                     {% endif %}
+                    <button type="button" class="btn-sm btn-danger" onclick="deleteOrder({{ order.id }})">删除</button>
                 </td>
             </tr>
             {% else %}
@@ -124,4 +125,32 @@
     {% endif %}
 </div>
 {% endif %}
+<script>
+async function deleteOrder(orderId) {
+    try {
+        const infoResponse = await fetch(`/orders/api/${orderId}/delete_info`);
+        if (!infoResponse.ok) {
+            alert('无法读取交易记录，可能已被删除或没有权限。');
+            return;
+        }
+        const info = await infoResponse.json();
+        const message = info.has_review
+            ? `这笔交易已有复盘数据，删除交易会同时删除复盘，是否继续？\nTicket: ${info.ticket}`
+            : `确定删除这笔交易记录？\nTicket: ${info.ticket}`;
+        if (!confirm(message)) {
+            return;
+        }
+
+        const deleteResponse = await fetch(`/orders/api/${orderId}`, {method: 'DELETE'});
+        const result = await deleteResponse.json().catch(() => ({}));
+        if (!deleteResponse.ok || result.status !== 'ok') {
+            alert(result.message || '删除失败，请刷新后重试。');
+            return;
+        }
+        location.reload();
+    } catch (error) {
+        alert('删除失败，请检查网络后重试。');
+    }
+}
+</script>
 {% endblock %}

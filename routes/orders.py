@@ -82,3 +82,30 @@ def order_detail(order_id):
         query = query.filter_by(user_id=current_user.id)
     order = query.first_or_404()
     return jsonify(order.to_dict())
+
+
+@orders_bp.route('/api/<int:order_id>/delete_info')
+@login_required
+def order_delete_info(order_id):
+    """Return deletion warning details for the current user's order."""
+    order = Order.query.filter_by(id=order_id, user_id=current_user.id).first_or_404()
+    return jsonify({
+        'id': order.id,
+        'ticket': order.ticket,
+        'has_review': order.review is not None,
+    })
+
+
+@orders_bp.route('/api/<int:order_id>', methods=['DELETE'])
+@login_required
+def order_delete(order_id):
+    """Delete one order owned by the current user."""
+    order = Order.query.filter_by(id=order_id, user_id=current_user.id).first_or_404()
+    deleted_review = order.review is not None
+    db.session.delete(order)
+    db.session.commit()
+    return jsonify({
+        'status': 'ok',
+        'message': '交易记录已删除',
+        'deleted_review': deleted_review,
+    })

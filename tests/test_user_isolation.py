@@ -109,6 +109,42 @@ def test_order_detail_does_not_expose_another_users_order(client):
     assert response.status_code == 404
 
 
+def test_order_delete_info_reports_review_for_owned_order(client):
+    login_as(client, 2)
+
+    response = client.get("/orders/api/2/delete_info")
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["has_review"] is True
+    assert data["ticket"] == 2001
+
+
+def test_delete_order_removes_owned_order_and_review(client, app):
+    login_as(client, 2)
+
+    response = client.delete("/orders/api/2")
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["status"] == "ok"
+    assert data["deleted_review"] is True
+    with app.app_context():
+        assert Order.query.get(2) is None
+        assert TradeReview.query.filter_by(order_id=2).first() is None
+
+
+def test_cannot_delete_another_users_order(client, app):
+    login_as(client, 1)
+
+    response = client.delete("/orders/api/2")
+
+    assert response.status_code == 404
+    with app.app_context():
+        assert Order.query.get(2) is not None
+        assert TradeReview.query.filter_by(order_id=2).first() is not None
+
+
 def test_cannot_create_review_for_another_users_order(client, app):
     login_as(client, 1)
 
