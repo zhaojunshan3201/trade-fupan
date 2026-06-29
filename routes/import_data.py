@@ -544,6 +544,7 @@ def mql4_push():
 
     batch_id = f'mql4-{uuid.uuid4().hex[:8]}'
     imported = 0
+    updated = 0
     skipped = 0
 
     for item in data:
@@ -554,10 +555,6 @@ def mql4_push():
                 continue
 
             # 去重
-            if Order.query.filter_by(ticket=ticket).first():
-                skipped += 1
-                continue
-
             symbol = item.get('symbol', '').upper()
             if not symbol:
                 skipped += 1
@@ -590,7 +587,6 @@ def mql4_push():
                 if isinstance(val, (int, float)):
                     # MQL4 datetime = seconds since 1970
                     return datetime.fromtimestamp(int(val))
-                # 字符串
                 return parse_mt4_datetime(str(val))
 
             open_time = parse_dt(item.get('open_time'))
@@ -607,6 +603,23 @@ def mql4_push():
             tp = item.get('tp')
             if tp is not None:
                 tp = float(tp)
+
+            existing = Order.query.filter_by(ticket=ticket).first()
+            if existing:
+                if existing.close_time is None and close_time is not None:
+                    existing.close_time = close_time
+                    existing.close_price = close_price
+                    existing.profit = profit
+                    existing.commission = float(item.get('commission', existing.commission or 0))
+                    existing.swap = float(item.get('swap', existing.swap or 0))
+                    existing.balance = balance
+                    existing.sl = sl
+                    existing.tp = tp
+                    existing.comment = str(item.get('comment', existing.comment or ''))
+                    updated += 1
+                else:
+                    skipped += 1
+                continue
 
             order = Order(
                 ticket=ticket,
@@ -640,6 +653,7 @@ def mql4_push():
     return jsonify({
         'status': 'ok',
         'imported': imported,
+        'updated': updated,
         'skipped': skipped,
         'batch': batch_id,
     })

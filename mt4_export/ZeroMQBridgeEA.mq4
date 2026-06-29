@@ -10,6 +10,7 @@
 input int PublishPort = 5555;
 input int AccountIntervalSeconds = 5;
 input int OrdersIntervalSeconds = 30;
+input bool PublishOpenOrders = true;
 
 Context *g_context = NULL;
 Socket *g_publisher = NULL;
@@ -95,7 +96,7 @@ string OrderTypeText(int orderType)
    return IntegerToString(orderType);
 }
 
-void PublishOrder()
+bool PublishOrder()
 {
    string payload = "{";
    payload += "\"ticket\":" + IntegerToString(OrderTicket()) + ",";
@@ -116,12 +117,13 @@ void PublishOrder()
    payload += "\"account_number\":" + IntegerToString(AccountNumber());
    payload += "}";
 
-   Publish("ORDER", payload);
+   return Publish("ORDER", payload);
 }
 
-void PublishClosedOrders()
+int PublishClosedOrders()
 {
    int total = OrdersHistoryTotal();
+   int sent = 0;
    for(int i = 0; i < total; i++)
    {
       if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
@@ -134,8 +136,41 @@ void PublishClosedOrders()
       if(type != OP_BUY && type != OP_SELL)
          continue;
 
-      PublishOrder();
+      if(PublishOrder())
+         sent++;
    }
+   return sent;
+}
+
+int PublishActiveOrders()
+{
+   int total = OrdersTotal();
+   int sent = 0;
+   for(int i = 0; i < total; i++)
+   {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+         continue;
+
+      int type = OrderType();
+      if(type != OP_BUY && type != OP_SELL)
+         continue;
+
+      if(PublishOrder())
+         sent++;
+   }
+   return sent;
+}
+
+void PublishOrdersSnapshot()
+{
+   int openSent = 0;
+   if(PublishOpenOrders)
+      openSent = PublishActiveOrders();
+   int closedSent = PublishClosedOrders();
+   Print("ZeroMQBridgeEA order scan: open_total=", OrdersTotal(),
+         " open_sent=", openSent,
+         " history_total=", OrdersHistoryTotal(),
+         " closed_sent=", closedSent);
 }
 
 int OnInit()
@@ -153,6 +188,10 @@ int OnInit()
 
    EventSetTimer(1);
    Print("ZeroMQBridgeEA started at ", address);
+   PublishAccount();
+   PublishOrdersSnapshot();
+   g_lastAccountPublish = TimeCurrent();
+   g_lastOrdersPublish = TimeCurrent();
    return INIT_SUCCEEDED;
 }
 
@@ -187,7 +226,7 @@ void OnTick()
 
    if(now - g_lastOrdersPublish >= OrdersIntervalSeconds)
    {
-      PublishClosedOrders();
+      PublishOrdersSnapshot();
       g_lastOrdersPublish = now;
    }
 }

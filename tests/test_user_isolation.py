@@ -9,7 +9,7 @@ os.environ["AUTO_SYNC_ENABLED"] = "false"
 import pytest
 
 from app import create_app
-from models import db, Order, TradeReview, TradingPlan, User
+from models import db, Order, PlatformConfig, TradeReview, TradingPlan, TradingAccount, User
 
 
 @pytest.fixture()
@@ -92,6 +92,22 @@ def seed_data():
             direction="sell",
         ),
     ])
+    platform = PlatformConfig(
+        user_id=u2.id,
+        name="Bob MT4",
+        platform_type="mt4",
+        server="Axi-US03-Demo",
+    )
+    db.session.add(platform)
+    db.session.flush()
+    db.session.add(
+        TradingAccount(
+            user_id=u2.id,
+            platform_id=platform.id,
+            account_number=1246398492,
+            account_name="Bob MT4 demo",
+        )
+    )
     db.session.commit()
 
 
@@ -320,6 +336,77 @@ def test_mql_push_accepts_mt5_style_type_key(client, app):
         order = Order.query.filter_by(ticket=4001).one()
         assert order.order_type == "buy"
         assert order.account_number == 60109377
+
+
+def test_mql_push_assigns_user_from_item_account_number(client, app):
+    response = client.post(
+        "/import/api/mql4_push",
+        json=[{
+            "ticket": 4002,
+            "symbol": "XAUUSD",
+            "type": "sell",
+            "volume": 0.38,
+            "open_price": 4012.75,
+            "close_price": 3990.10,
+            "open_time": "2026.06.29 22:13:36",
+            "close_time": "2026.06.29 23:13:36",
+            "profit": 120.50,
+            "account_number": 1246398492,
+        }],
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["imported"] == 1
+    with app.app_context():
+        order = Order.query.filter_by(ticket=4002).one()
+        assert order.account_number == 1246398492
+        assert order.user_id == 2
+
+
+def test_mql_push_updates_existing_open_order_when_closed(client, app):
+    with app.app_context():
+        db.session.add(
+            Order(
+                ticket=4003,
+                user_id=2,
+                symbol="XAUUSD",
+                order_type="sell",
+                volume=0.38,
+                open_time=datetime(2026, 6, 29, 22, 13, 36),
+                close_time=None,
+                open_price=4012.75,
+                close_price=0,
+                profit=0,
+                account_number=1246398492,
+            )
+        )
+        db.session.commit()
+
+    response = client.post(
+        "/import/api/mql4_push",
+        json=[{
+            "ticket": 4003,
+            "symbol": "XAUUSD",
+            "type": "sell",
+            "volume": 0.38,
+            "open_price": 4012.75,
+            "close_price": 3990.10,
+            "open_time": "2026.06.29 22:13:36",
+            "close_time": "2026.06.29 23:13:36",
+            "profit": 120.50,
+            "account_number": 1246398492,
+        }],
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["imported"] == 0
+    assert data["updated"] == 1
+    with app.app_context():
+        order = Order.query.filter_by(ticket=4003).one()
+        assert order.close_time == datetime(2026, 6, 29, 23, 13, 36)
+        assert order.close_price == 3990.10
+        assert order.profit == 120.50
 
 
 def test_client_script_downloads_are_available_after_login(client):
