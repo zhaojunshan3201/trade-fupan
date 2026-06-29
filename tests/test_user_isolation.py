@@ -297,6 +297,31 @@ def test_csv_upload_accepts_api_token_for_client_push(client, app):
         assert order.user_id == 1
 
 
+def test_mql_push_accepts_mt5_style_type_key(client, app):
+    response = client.post(
+        "/import/api/mql4_push",
+        json=[{
+            "ticket": 4001,
+            "symbol": "AUDCAD",
+            "Type": "buy",
+            "volume": 1.29,
+            "open_price": 0.97779,
+            "close_price": 0.97779,
+            "open_time": "2026.06.29 13:28:38",
+            "close_time": "2026.06.29 13:28:38",
+            "profit": -50.03,
+            "account_number": 60109377,
+        }],
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["imported"] == 1
+    with app.app_context():
+        order = Order.query.filter_by(ticket=4001).one()
+        assert order.order_type == "buy"
+        assert order.account_number == 60109377
+
+
 def test_client_script_downloads_are_available_after_login(client):
     login_as(client, 1)
 

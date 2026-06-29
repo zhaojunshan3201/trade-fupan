@@ -494,14 +494,21 @@ def _get_push_user_id():
         pass
 
     # 2. API Token 认证（客户端推送用）
-    token = request.args.get('token') or (request.json or {}).get('token')
+    payload = request.get_json(silent=True)
+    token = request.args.get('token') or (payload.get('token') if isinstance(payload, dict) else None)
     if token:
         user = User.query.filter_by(api_token=token, is_active=True).first()
         if user:
             return user.id
 
     # 3. 通过 account_number 反查
-    acct_num = (request.json or {}).get('account_number') if request.is_json else None
+    acct_num = None
+    if isinstance(payload, dict):
+        acct_num = payload.get('account_number')
+    elif isinstance(payload, list) and payload:
+        first = payload[0]
+        if isinstance(first, dict):
+            acct_num = first.get('account_number')
     if acct_num:
         ta = TradingAccount.query.filter_by(account_number=int(acct_num)).first()
         if ta:
@@ -556,7 +563,7 @@ def mql4_push():
                 skipped += 1
                 continue
 
-            order_type = item.get('type', '').lower()
+            order_type = item.get('type', item.get('Type', '')).lower()
             if order_type in ('buy', 'sell'):
                 pass
             elif 'buy' in order_type:
