@@ -150,3 +150,21 @@ def test_account_latest_can_filter_by_terminal_type(client, app):
     data = response.get_json()
     assert data["terminal_type"] == "mt4"
     assert data["number"] == 1246398492
+
+
+def test_mt5_zmq_bridge_tags_account_as_mt5(monkeypatch):
+    import mt5_connect.mt5_zmq_bridge as bridge
+
+    captured = {}
+    monkeypatch.setattr(bridge, "push_account", lambda account: captured.update(account))
+
+    bridge.process_account_data({
+        "login": 60102506,
+        "name": "MT5 Account",
+        "server": "Broker-MT5",
+        "balance": 7934.25,
+    })
+
+    assert captured["number"] == 60102506
+    assert captured["terminal"] == "MetaTrader 5"
+    assert captured["terminal_type"] == "mt5"

@@ -277,3 +277,12 @@ trade-journal/
 
 - MT4 自动推送依赖本机 MT4 脚本或 CSV 导出
 - MT5 连接、历史成交导入和 K 线快照依赖本机 MT5 终端、登录账户和历史数据
+## MT5 ZeroMQ real-time bridge
+
+- MT5 EA source: `mt5_export/ZeroMQBridgeEA.mq5`
+- Download URL: `/mt5_export/ZeroMQBridgeEA.mq5`
+- Python bridge: `python mt5_connect/mt5_zmq_bridge.py --port 5556 --url http://127.0.0.1:5000`
+- Default MT5 ZeroMQ port: `5556`; MT4 uses `5555`.
+- Install `mql-zmq` Include files into MT5 `MQL5/Include`, and `libzmq.dll` / `libsodium.dll` into MT5 `MQL5/Libraries`.
+- In MT5, enable DLL imports, then attach `ZeroMQBridgeEA` to any chart.
+- The EA publishes account snapshots and recent closed deals; the Python bridge forwards them to Flask.

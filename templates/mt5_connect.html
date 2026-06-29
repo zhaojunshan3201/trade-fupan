@@ -155,6 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addMt5Log('🟢 MT5 连接页面已加载', 'info');
     addMt5Log('服务器部署模式下，请到「账户管理」下载一键连接包', 'info');
     loadOrdersCount();
+    loadMt5ZmqAccount();
 });
 
 // ========== 日志 ==========
@@ -384,6 +385,20 @@ async function loadOrdersCount() {
     try {
         const r = await fetch('/orders/api/list?per_page=1').then(r => r.json());
         document.getElementById('mt5-orders').textContent = r.total || 0;
+    } catch(e) {}
+}
+
+async function loadMt5ZmqAccount() {
+    try {
+        const acct = await fetch('/import/api/account_latest?terminal_type=mt5').then(r => r.json());
+        if (!acct || !acct.number) return;
+
+        setStatCard('mt5-acct-status', acct.number, 'var(--profit)');
+        if (typeof acct.balance === 'number') {
+            setStatCard('mt5-balance', '$' + acct.balance.toFixed(2), 'var(--profit)');
+        }
+        setStatus('acct', true, `ZeroMQ: ${acct.number} (${acct.server || '-'})`);
+        addMt5Log(`ZeroMQ MT5 账户连接: ${acct.number} ${acct.name || ''} 余额 $${Number(acct.balance || 0).toFixed(2)}`, 'success');
     } catch(e) {}
 }
 

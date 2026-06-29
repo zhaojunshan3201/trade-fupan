@@ -78,3 +78,15 @@ def test_mt4_export_files_are_downloadable():
         assert response.status_code == 200
         assert response.headers["Content-Disposition"].startswith("attachment;")
         assert filename.encode() in response.data[:200]
+
+
+def test_mt5_export_files_are_downloadable():
+    app = create_app()
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    response = client.get("/mt5_export/ZeroMQBridgeEA.mq5")
+
+    assert response.status_code == 200
+    assert response.headers["Content-Disposition"].startswith("attachment;")
+    assert b"ZeroMQBridgeEA.mq5" in response.data[:200]
