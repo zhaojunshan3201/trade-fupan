@@ -1,5 +1,6 @@
 import builtins
 import os
+from datetime import datetime, timedelta
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["AUTO_SYNC_ENABLED"] = "false"
@@ -115,3 +116,37 @@ def test_account_latest_does_not_return_unrelated_global_snapshot(client, app):
 
     assert response.status_code == 200
     assert response.get_json() is None
+
+
+def test_account_latest_can_filter_by_terminal_type(client, app):
+    login_as(client, 1)
+    now = datetime.utcnow()
+    with app.app_context():
+        db.session.add_all(
+            [
+                AccountInfo(
+                    number=60102506,
+                    name="MT5 Account",
+                    server="MT5-Demo",
+                    balance=7934.25,
+                    terminal_type="mt5",
+                    recorded_at=now + timedelta(seconds=10),
+                ),
+                AccountInfo(
+                    number=1246398492,
+                    name="MT4 Account",
+                    server="Axi-US03-Demo",
+                    balance=100000,
+                    terminal_type="mt4",
+                    recorded_at=now,
+                ),
+            ]
+        )
+        db.session.commit()
+
+    response = client.get("/import/api/account_latest?terminal_type=mt4")
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["terminal_type"] == "mt4"
+    assert data["number"] == 1246398492

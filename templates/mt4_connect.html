@@ -158,7 +158,7 @@ function addLog(message, type='info') {
 async function loadConnectionStatus() {
     try {
         // 加载账户信息
-        const acct = await fetch('/import/api/account_latest').then(r => r.json());
+        const acct = await fetch('/import/api/account_latest?terminal_type=mt4').then(r => r.json());
         const acctStatus = document.getElementById('acct-status');
         if (acct && acct.number) {
             acctStatus.textContent = `${acct.number} (${acct.server})`;

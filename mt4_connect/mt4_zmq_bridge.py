@@ -134,6 +134,8 @@ def process_account_data(acct_data):
         'margin': acct_data.get('margin', acct_data.get('Margin', 0)),
         'profit': acct_data.get('profit', acct_data.get('Profit', 0)),
         'is_demo': acct_data.get('is_demo', acct_data.get('isDemo', True)),
+        'terminal': 'MetaTrader 4',
+        'terminal_type': 'mt4',
     }
     push_account(normalized)
 

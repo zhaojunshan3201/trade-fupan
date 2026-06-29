@@ -678,6 +678,18 @@ def api_account_latest():
     """获取最新账户信息"""
     from models import TradingAccount
 
+    terminal_type = request.args.get('terminal_type')
+    if terminal_type in ('mt4', 'mt5'):
+        info = (
+            AccountInfo.query
+            .filter_by(terminal_type=terminal_type)
+            .order_by(AccountInfo.recorded_at.desc())
+            .first()
+        )
+        if info:
+            return jsonify(info.to_dict())
+        return jsonify(None)
+
     account_numbers = {
         row[0]
         for row in db.session.query(TradingAccount.account_number)
