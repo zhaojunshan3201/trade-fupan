@@ -109,3 +109,41 @@ def order_delete(order_id):
         'message': '交易记录已删除',
         'deleted_review': deleted_review,
     })
+
+
+@orders_bp.route('/api/bulk_delete', methods=['POST'])
+@login_required
+def order_bulk_delete():
+    """Delete selected orders owned by the current user."""
+    data = request.get_json(silent=True) or {}
+    raw_ids = data.get('ids') or []
+    order_ids = []
+    for raw_id in raw_ids:
+        try:
+            order_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+
+    if not order_ids:
+        return jsonify({'status': 'error', 'message': '请选择要删除的交易记录'}), 400
+
+    requested_ids = set(order_ids)
+    orders = (
+        Order.query
+        .filter(Order.id.in_(requested_ids), Order.user_id == current_user.id)
+        .all()
+    )
+    deleted_review_count = sum(1 for order in orders if order.review is not None)
+    deleted_count = len(orders)
+
+    for order in orders:
+        db.session.delete(order)
+    db.session.commit()
+
+    return jsonify({
+        'status': 'ok',
+        'message': f'已删除 {deleted_count} 条交易记录',
+        'deleted_count': deleted_count,
+        'deleted_review_count': deleted_review_count,
+        'skipped_count': len(requested_ids) - deleted_count,
+    })

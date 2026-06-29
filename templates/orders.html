@@ -4,6 +4,7 @@
 <div class="page-header">
     <h1>📋 交易记录</h1>
     <div class="header-actions">
+        <button type="button" class="btn btn-danger" onclick="bulkDeleteOrders()">批量删除</button>
         <a href="/import/" class="btn">+ 导入数据</a>
     </div>
 </div>
@@ -59,6 +60,7 @@
     <table class="table">
         <thead>
             <tr>
+                <th><input type="checkbox" id="select-all-orders" onclick="toggleAllOrders(this)"></th>
                 <th>Ticket</th>
                 <th>品种</th>
                 <th>方向</th>
@@ -76,6 +78,9 @@
         <tbody>
             {% for order in orders %}
             <tr class="{% if order.is_win %}row-win{% elif order.profit < 0 %}row-loss{% endif %}">
+                <td>
+                    <input type="checkbox" class="order-select" value="{{ order.id }}" data-reviewed="{{ 'true' if order.is_reviewed else 'false' }}">
+                </td>
                 <td class="mono">{{ order.ticket }}</td>
                 <td><strong>{{ order.symbol }}</strong></td>
                 <td><span class="tag tag-{{ order.order_type }}">{{ order.order_type }}</span></td>
@@ -106,7 +111,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="12" class="empty-state">暂无交易数据</td>
+                <td colspan="13" class="empty-state">暂无交易数据</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -126,6 +131,16 @@
 </div>
 {% endif %}
 <script>
+function selectedOrderCheckboxes() {
+    return Array.from(document.querySelectorAll('.order-select:checked'));
+}
+
+function toggleAllOrders(source) {
+    document.querySelectorAll('.order-select').forEach((checkbox) => {
+        checkbox.checked = source.checked;
+    });
+}
+
 async function deleteOrder(orderId) {
     try {
         const infoResponse = await fetch(`/orders/api/${orderId}/delete_info`);
@@ -150,6 +165,43 @@ async function deleteOrder(orderId) {
         location.reload();
     } catch (error) {
         alert('删除失败，请检查网络后重试。');
+    }
+}
+
+async function bulkDeleteOrders() {
+    const selected = selectedOrderCheckboxes();
+    if (selected.length === 0) {
+        alert('请先选择要删除的交易记录。');
+        return;
+    }
+
+    const ids = selected.map((checkbox) => Number(checkbox.value));
+    const reviewedCount = selected.filter((checkbox) => checkbox.dataset.reviewed === 'true').length;
+    const message = reviewedCount > 0
+        ? `选中的 ${selected.length} 条交易中有 ${reviewedCount} 条已有复盘，删除交易会同时删除这些复盘，是否继续？`
+        : `确定删除选中的 ${selected.length} 条交易记录？`;
+
+    if (!confirm(message)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/orders/api/bulk_delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids}),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status !== 'ok') {
+            alert(result.message || '批量删除失败，请刷新后重试。');
+            return;
+        }
+        if (result.skipped_count > 0) {
+            alert(`已删除 ${result.deleted_count} 条交易记录，${result.skipped_count} 条无权限或不存在。`);
+        }
+        location.reload();
+    } catch (error) {
+        alert('批量删除失败，请检查网络后重试。');
     }
 }
 </script>

@@ -145,6 +145,37 @@ def test_cannot_delete_another_users_order(client, app):
         assert TradeReview.query.filter_by(order_id=2).first() is not None
 
 
+def test_bulk_delete_orders_removes_owned_orders_and_reviews(client, app):
+    login_as(client, 2)
+
+    response = client.post("/orders/api/bulk_delete", json={"ids": [2]})
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["status"] == "ok"
+    assert data["deleted_count"] == 1
+    assert data["deleted_review_count"] == 1
+    assert data["skipped_count"] == 0
+    with app.app_context():
+        assert Order.query.get(2) is None
+        assert TradeReview.query.filter_by(order_id=2).first() is None
+
+
+def test_bulk_delete_orders_skips_another_users_orders(client, app):
+    login_as(client, 1)
+
+    response = client.post("/orders/api/bulk_delete", json={"ids": [1, 2]})
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["deleted_count"] == 1
+    assert data["skipped_count"] == 1
+    with app.app_context():
+        assert Order.query.get(1) is None
+        assert Order.query.get(2) is not None
+        assert TradeReview.query.filter_by(order_id=2).first() is not None
+
+
 def test_cannot_create_review_for_another_users_order(client, app):
     login_as(client, 1)
 
